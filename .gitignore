@@ -144,3 +144,5 @@ vite.config.ts.timestamp-*
 
 # Vite local-only overrides (config.local.json, etc.)
 *.local
+
+public/config.json

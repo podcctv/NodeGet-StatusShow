@@ -1,0 +1,16 @@
+{
+  "site_name": "NodeGet Status",
+  "site_logo": "",
+  "theme_name": "default",
+  "theme_repo": "",
+  "theme_config": {
+    "footer": "Powered by NodeGet"
+  },
+  "site_tokens": [
+    {
+      "name": "master server node 1",
+      "backend_url": "wss://your-backend.example.com",
+      "token": "YOUR_TOKEN_HERE"
+    }
+  ]
+}
