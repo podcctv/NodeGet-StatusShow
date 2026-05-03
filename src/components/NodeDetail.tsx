@@ -383,6 +383,7 @@ function LatencyBlock({ title, rows, type, loading }: LatencyBlockProps) {
                 tick={{ fontSize: 11 }}
                 stroke="hsl(var(--muted-foreground))"
                 width={48}
+                domain={['auto', 'auto']}
               />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
