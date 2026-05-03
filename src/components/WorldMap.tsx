@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps'
 import { Card } from './ui/card'
 import { displayName } from '../utils/derive'
@@ -38,9 +38,13 @@ function groupKey(lat: number, lng: number) {
 }
 
 export function WorldMap({ nodes, onOpen }: Props) {
-  const [hover, setHover] = useState<string | null>(null)
-  const [openCluster, setOpenCluster] = useState<string | null>(null)
+  const [openKey, setOpenKey] = useState<string | null>(null)
+  const [renderKey, setRenderKey] = useState<string | null>(null)
   const closeTimer = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (openKey) setRenderKey(openKey)
+  }, [openKey])
 
   function cancelClose() {
     if (closeTimer.current != null) {
@@ -50,7 +54,7 @@ export function WorldMap({ nodes, onOpen }: Props) {
   }
   function scheduleClose() {
     cancelClose()
-    closeTimer.current = window.setTimeout(() => setOpenCluster(null), 150)
+    closeTimer.current = window.setTimeout(() => setOpenKey(null), 150)
   }
 
   const groups = useMemo(() => {
@@ -77,7 +81,7 @@ export function WorldMap({ nodes, onOpen }: Props) {
       <div
         className="relative w-full overflow-hidden rounded-md border border-border/60 bg-background/40 text-foreground"
         style={{ aspectRatio: `${MAP_W} / ${MAP_H}` }}
-        onClick={() => setOpenCluster(null)}
+        onClick={() => setOpenKey(null)}
       >
         <ComposableMap
           projection="geoEqualEarth"
@@ -94,7 +98,7 @@ export function WorldMap({ nodes, onOpen }: Props) {
               <stop offset="55%" stopColor="hsl(var(--background))" stopOpacity="0" />
               <stop offset="100%" stopColor="hsl(var(--background))" stopOpacity="0.55" />
             </radialGradient>
-            <filter id="dot-glow" x="-200%" y="-200%" width="400%" height="400%">
+            <filter id="dot-glow" filterUnits="userSpaceOnUse" x="-20" y="-20" width="40" height="40">
               <feGaussianBlur stdDeviation="2" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
@@ -118,24 +122,17 @@ export function WorldMap({ nodes, onOpen }: Props) {
             const onlineCount = g.nodes.filter(n => n.online).length
             const color = onlineCount > 0 ? GREEN : GRAY
             const node = g.nodes[0]
-            const isOpen = isCluster ? openCluster === g.key : hover === node.uuid
+            const isOpen = openKey === g.key
 
             return (
               <Marker
                 key={g.key}
                 coordinates={[g.lng, g.lat]}
                 onMouseEnter={() => {
-                  if (isCluster) {
-                    cancelClose()
-                    setOpenCluster(g.key)
-                  } else {
-                    setHover(node.uuid)
-                  }
+                  cancelClose()
+                  setOpenKey(g.key)
                 }}
-                onMouseLeave={() => {
-                  if (isCluster) scheduleClose()
-                  else setHover(null)
-                }}
+                onMouseLeave={scheduleClose}
                 onClick={(e: any) => {
                   e.stopPropagation?.()
                   if (!isCluster) onOpen?.(node.uuid)
@@ -177,19 +174,17 @@ export function WorldMap({ nodes, onOpen }: Props) {
                   </text>
                 )}
 
-                {!isCluster && isOpen && (
-                  <text y={-14} textAnchor="middle" fontFamily="monospace" fontSize="10" fill="currentColor" fillOpacity="0.9" style={{ pointerEvents: 'none' }}>
-                    {displayName(node)}
-                  </text>
-                )}
-
-                {isCluster && isOpen && (
+                {renderKey === g.key && (
                   <ClusterList
                     nodes={g.nodes}
                     lat={g.lat}
                     lng={g.lng}
+                    state={isOpen ? 'open' : 'closed'}
+                    onAnimationEnd={() => {
+                      if (!isOpen) setRenderKey(k => (k === g.key ? null : k))
+                    }}
                     onPick={uuid => {
-                      setOpenCluster(null)
+                      setOpenKey(null)
                       onOpen?.(uuid)
                     }}
                     onMouseEnter={cancelClose}
@@ -221,6 +216,8 @@ function ClusterList({
   nodes,
   lat,
   lng,
+  state,
+  onAnimationEnd,
   onPick,
   onMouseEnter,
   onMouseLeave,
@@ -228,6 +225,8 @@ function ClusterList({
   nodes: Node[]
   lat: number
   lng: number
+  state: 'open' | 'closed'
+  onAnimationEnd?: () => void
   onPick: (uuid: string) => void
   onMouseEnter?: () => void
   onMouseLeave?: () => void
@@ -241,12 +240,16 @@ function ClusterList({
   if (lng > 60) x = -width + gap
   else if (lng < -60) x = -gap
 
-  const y = lat > 25 ? gap : -height - gap
+  const below = lat > 25
+  const y = below ? gap : -height - gap
+  const origin = below ? 'origin-top' : 'origin-bottom'
 
   return (
     <foreignObject x={x} y={y} width={width} height={height} style={{ overflow: 'visible' }}>
       <div
-        className="rounded-md border bg-popover text-popover-foreground text-xs shadow-md py-1 max-h-32 overflow-auto"
+        data-state={state}
+        onAnimationEnd={onAnimationEnd}
+        className={`rounded-md border bg-popover text-popover-foreground text-xs shadow-md py-1 max-h-32 overflow-auto ${origin} fill-mode-forwards duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95`}
         onClick={e => e.stopPropagation()}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
