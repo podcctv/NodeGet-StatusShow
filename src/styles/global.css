@@ -142,6 +142,22 @@
     0 0 0 1px rgba(56, 189, 248, 0.25),
     0 0 32px -18px rgba(99, 102, 241, 0.65);
 }
+
+.progress-glow {
+  position: relative;
+  box-shadow:
+    0 0 10px rgba(45, 212, 191, 0.45),
+    0 0 22px rgba(56, 189, 248, 0.3);
+}
+
+.progress-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.45) 48%, transparent 100%);
+  mix-blend-mode: screen;
+  animation: progress-scan 2.4s linear infinite;
+}
 .cyber-card::before {
   content: '';
   position: absolute;
@@ -246,4 +262,9 @@
 @keyframes grid-drift {
   0% { transform: translate3d(0, 0, 0); }
   100% { transform: translate3d(20px, 20px, 0); }
+}
+
+@keyframes progress-scan {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
 }
