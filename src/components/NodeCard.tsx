@@ -22,7 +22,7 @@ export function NodeCard({ node }: { node: Node }) {
       <a href={`#${encodeURIComponent(node.uuid)}`} className="block">
         <Card
             className={cn(
-                'p-4 transition hover:border-primary/50 hover:shadow-md flex flex-col gap-3',
+                'p-4 transition hover:border-primary/50 hover:shadow-md flex flex-col gap-3 cyber-card',
                 !node.online && 'opacity-60',
             )}
         >
@@ -56,7 +56,6 @@ export function NodeCard({ node }: { node: Node }) {
                 sub={u.diskTotal ? `${bytes(u.diskUsed)} / ${bytes(u.diskTotal)}` : null}
             />
           </div>
-
           <div className="pt-2.5 border-t border-dashed font-mono text-xs text-muted-foreground space-y-1.5">
             <div className="flex items-center gap-3">
               <Stat icon={ArrowDown}>{bytes(u.netIn || 0)}/s</Stat>
@@ -79,44 +78,5 @@ export function NodeCard({ node }: { node: Node }) {
           )}
         </Card>
       </a>
-  )
-}
-
-function Stat({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
-  return (
-      <span className="inline-flex items-center gap-1">
-      <Icon className="h-3 w-3" />
-        {children}
-    </span>
-  )
-}
-
-function Metric({
-                  label,
-                  value,
-                  sub,
-                  subTitle,
-                }: {
-  label: string
-  value: number | undefined
-  sub?: string | null
-  subTitle?: string
-}) {
-  return (
-      <div className="min-w-0">
-        <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">{label}</span>
-          <span className="font-mono">{pct(value)}</span>
-        </div>
-        <Progress value={value} indicatorClassName={loadColor(value)} className="mt-1 h-1.5" />
-        {sub && (
-            <div
-                className="font-mono text-[11px] text-muted-foreground mt-1 truncate"
-                title={subTitle}
-            >
-              {sub}
-            </div>
-        )}
-      </div>
   )
 }
