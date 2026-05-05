@@ -20,7 +20,8 @@ export function NodeCard({ node }: { node: Node }) {
     <a href={`#${encodeURIComponent(node.uuid)}`} className="block">
       <Card
         className={cn(
-          'p-4 transition hover:border-primary/50 hover:shadow-md flex flex-col gap-3 cyber-card',
+          'p-4 transition duration-300 hover:border-primary/60 hover:-translate-y-1 hover:scale-[1.012] flex flex-col gap-3 cyber-card',
+          node.online && 'cyber-card-active',
           !node.online && 'opacity-60',
         )}
       >
