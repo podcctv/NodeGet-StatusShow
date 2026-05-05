@@ -232,7 +232,9 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
                     ? `${cpu.per_core.length} 核`
                     : null
               }
-@@ -231,50 +238,91 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
+            />
+          </Section>
+
           <Section title="网络与负载">
             <KV k="累计接收" v={d?.total_received != null ? bytes(d.total_received) : null} />
             <KV k="累计发送" v={d?.total_transmitted != null ? bytes(d.total_transmitted) : null} />
