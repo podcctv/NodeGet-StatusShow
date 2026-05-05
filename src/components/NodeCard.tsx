@@ -6,7 +6,7 @@ import { Flag } from './Flag'
 import { StatusDot } from './StatusDot'
 import { bytes, pct, relativeAge, uptime } from '../utils/format'
 import { cpuLabel, deriveUsage, displayName, distroLogo, osLabel, virtLabel } from '../utils/derive'
-import { cn, loadColor } from '../utils/cn'
+import { cn, loadColor, loadTextColor } from '../utils/cn'
 import type { Node } from '../types'
 import type { ReactNode } from 'react'
 export function NodeCard({ node }: { node: Node }) {
@@ -20,27 +20,28 @@ export function NodeCard({ node }: { node: Node }) {
     <a href={`#${encodeURIComponent(node.uuid)}`} className="block">
       <Card
         className={cn(
-          'p-4 transition duration-300 hover:border-primary/60 hover:-translate-y-1.5 hover:scale-[1.018] flex flex-col gap-3 cyber-card',          node.online && 'cyber-card-active',
+          'p-5 transition duration-300 hover:border-primary/60 hover:-translate-y-1.5 hover:scale-[1.018] flex flex-col gap-3.5 cyber-card',
+          node.online && 'cyber-card-active',
           !node.online && 'opacity-60',
         )}
       >
         <div className="cyber-orb" aria-hidden />
         <div className="cyber-grid" aria-hidden />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <StatusDot online={node.online} />
           {logo && <img src={logo} alt="" className="w-5 h-5 shrink-0 object-contain" loading="lazy" />}
-          <span className="font-semibold flex-1 min-w-0 truncate" title={displayName(node)}>
+          <span className="font-semibold text-lg tracking-wide flex-1 min-w-0 truncate" title={displayName(node)}>
             {displayName(node)}
           </span>
           <Flag code={node.meta?.region} className="shrink-0" />
         </div>
         {(os || virt) && <div className="font-mono text-xs text-muted-foreground truncate">{[os, virt].filter(Boolean).join(' · ')}</div>}
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-3 rounded-xl border border-cyan-300/15 bg-slate-950/30 px-3 py-2.5 shadow-[inset_0_0_24px_rgba(45,212,191,0.08)]">
           <Metric label="CPU" value={u.cpu} sub={cpu || null} subTitle={cpu || undefined} />
           <Metric label="内存" value={u.mem} sub={u.memTotal ? `${bytes(u.memUsed)} / ${bytes(u.memTotal)}` : null} />
           <Metric label="磁盘" value={u.disk} sub={u.diskTotal ? `${bytes(u.diskUsed)} / ${bytes(u.diskTotal)}` : null} />
         </div>
-        <div className="pt-2.5 border-t border-dashed font-mono text-xs text-muted-foreground space-y-1.5">
+        <div className="pt-3 border-t border-cyan-300/20 border-dashed font-mono text-xs text-slate-300/90 space-y-1.5">
           <div className="flex items-center gap-3">
             <Stat icon={ArrowDown}>{bytes(u.netIn || 0)}/s</Stat>
             <Stat icon={ArrowUp}>{bytes(u.netOut || 0)}/s</Stat>
@@ -76,17 +77,21 @@ function Metric({
 }) {
   const percent = pct(value)
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex items-center text-xs font-mono">
-        <span className="text-muted-foreground">{label}</span>
+        <span className="text-slate-300">{label}</span>
         {sub ? (
-          <span className="ml-2 text-muted-foreground truncate" title={subTitle}>
+          <span className="ml-2 text-slate-400 truncate" title={subTitle}>
             {sub}
           </span>
         ) : null}
-        <span className={cn('ml-auto font-semibold', loadColor(percent))}>{percent}%</span>
+        <span className={cn('ml-auto font-semibold tabular-nums', loadTextColor(percent))}>{percent}%</span>
       </div>
-      <Progress value={percent} className="h-1.5" indicatorClassName={loadColor(percent)} />
+      <Progress
+        value={percent}
+        className="h-2 rounded-sm bg-cyan-950/70 ring-1 ring-cyan-300/20"
+        indicatorClassName={cn(loadColor(percent), 'progress-glow')}
+      />
     </div>
   )
 }
