@@ -9,7 +9,7 @@ const REFRESH_MS = 60_000
 const QUERY_TIMEOUT_MS = 20_000
 const MAX_NODES = 160
 const DAY_MS = 24 * 60 * 60 * 1000
-const GLOBAL_LIMIT = 5000
+const GLOBAL_LIMIT = 100_000
 /** Delay before first ping fetch — let main data render first */
 const INITIAL_DELAY_MS = 3000
 
@@ -91,26 +91,38 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       const now = Date.now()
       const dayWindow: [number, number] = [now - DAY_MS, now]
 
-      // Query all tcp_ping tasks globally per backend (not per-node)
-      const jobs = pool.entries.flatMap(entry => [
-        taskQuery(
-          entry.client,
-          [{ timestamp_from_to: dayWindow }, { type: 'tcp_ping' }],
-          QUERY_TIMEOUT_MS,
-        ),
-        taskQuery(
-          entry.client,
-          [{ type: 'tcp_ping' }, { limit: GLOBAL_LIMIT }],
-          QUERY_TIMEOUT_MS,
-        ),
-        taskQuery(
-          entry.client,
-          [{ timestamp_from_to: dayWindow }, { limit: GLOBAL_LIMIT }],
-          QUERY_TIMEOUT_MS,
-        ),
-      ])
+      // Concurrency limiter to avoid overwhelming the backend
+      const executeBatched = async <T,>(tasks: (() => Promise<T>)[], limit: number) => {
+        const results: PromiseSettledResult<T>[] = []
+        let i = 0
+        const worker = async () => {
+          while (i < tasks.length && !cancelled) {
+            const idx = i++
+            try {
+              results[idx] = { status: 'fulfilled', value: await tasks[idx]() }
+            } catch (reason) {
+              results[idx] = { status: 'rejected', reason }
+            }
+          }
+        }
+        await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker))
+        return results
+      }
 
-      const settled = await Promise.allSettled(jobs)
+      // Query per UUID with concurrency to guarantee full history even if timestamp_from_to is unsupported
+      const jobs: (() => Promise<TaskQueryResult[]>)[] = []
+      for (const uuid of uuidSet) {
+        for (const entry of pool.entries) {
+          jobs.push(() => taskQuery(
+            entry.client,
+            // Provide both time window and fallback limit per node
+            [{ uuid }, { timestamp_from_to: dayWindow }, { type: 'tcp_ping' }, { limit: 500 }],
+            QUERY_TIMEOUT_MS,
+          ))
+        }
+      }
+
+      const settled = await executeBatched(jobs, 15) // Max 15 concurrent requests
       if (cancelled) return
 
       const denied = settled.some(
