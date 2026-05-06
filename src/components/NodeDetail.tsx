@@ -280,20 +280,25 @@ function OnlinePanel({ online }: { online: boolean }) {
 }
 
 function TcpMiniPanel({ rows }: { rows: TaskQueryResult[] }) {
-  const stats = useMemo(() => computeLatencyStats(rows, 'tcp_ping').slice(0, 3), [rows])
+  const stats = useMemo(() => computeLatencyStats(rows, 'tcp_ping').slice(0, 5), [rows])
   return (
-    <div className="rounded-xl border border-amber-400/25 bg-amber-500/5 p-4 space-y-2">
-      <div className="text-sm text-amber-300">二网 TCPing</div>
+    <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/5 p-4 space-y-2">
+      <div className="text-sm text-cyan-300">TCP Ping 质量</div>
       {stats.map(s => (
-        <div key={s.name} className="flex items-center gap-3">
-          <span className="w-12 text-xs text-muted-foreground truncate">{s.name}</span>
-          <div className="h-3 flex-1 rounded bg-black/20 overflow-hidden">
-            <div
-              className="h-full bg-amber-400"
-              style={{ width: `${Math.max(2, Math.min(100, 100 - (s.avg ?? 999) / 4))}%` }}
-            />
+        <div key={s.name} className="space-y-1">
+          <div className="flex items-center gap-3">
+            <span className="w-12 text-xs text-muted-foreground truncate">{s.name}</span>
+            <div className="h-3 flex-1 rounded bg-black/20 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-400 to-sky-400"
+                style={{ width: `${Math.max(2, Math.min(100, 100 - (s.avg ?? 999) / 4))}%` }}
+              />
+            </div>
+            <span className="w-14 text-right font-mono text-xs">{s.avg != null ? `${Math.round(s.avg)}ms` : '—'}</span>
           </div>
-          <span className="w-14 text-right font-mono text-xs">{s.avg != null ? `${Math.round(s.avg)}ms` : '—'}</span>
+          <div className="ml-[3.75rem] text-[11px] text-muted-foreground font-mono">
+            min {s.min != null ? `${Math.round(s.min)}ms` : '—'} · max {s.max != null ? `${Math.round(s.max)}ms` : '—'} · 丢包 {s.loss.toFixed(1)}%
+          </div>
         </div>
       ))}
       {stats.length === 0 && <div className="text-xs text-muted-foreground">暂无 TCP ping 数据</div>}

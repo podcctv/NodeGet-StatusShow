@@ -75,7 +75,8 @@ function Metric({
   sub?: ReactNode
   subTitle?: string
 }) {
-  const percent = pct(value)
+  const numericValue = Number.isFinite(value) ? (value as number) : undefined
+  const percent = pct(numericValue)
   return (
     <div className="space-y-1">
       <div className="flex items-center text-xs font-mono">
@@ -85,12 +86,12 @@ function Metric({
             {sub}
           </span>
         ) : null}
-        <span className={cn('ml-auto font-semibold tabular-nums', loadTextColor(percent))}>{percent}%</span>
+        <span className={cn('ml-auto font-semibold tabular-nums', loadTextColor(numericValue))}>{percent}</span>
       </div>
       <Progress
-        value={percent}
-        className="h-2 rounded-sm bg-cyan-950/70 ring-1 ring-cyan-300/20"
-        indicatorClassName={cn(loadColor(percent), 'progress-glow')}
+        value={numericValue}
+        className="h-2 rounded-sm bg-slate-800/80 ring-1 ring-white/10"
+        indicatorClassName={cn(loadColor(numericValue), 'progress-glow')}
       />
     </div>
   )
