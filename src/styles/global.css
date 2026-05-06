@@ -236,6 +236,35 @@
   z-index: 1;
 }
 
+.latency-panel {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(8, 18, 40, 0.72), rgba(15, 23, 42, 0.82) 48%, rgba(18, 17, 38, 0.76)),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.08), transparent 34%, rgba(168, 85, 247, 0.08));
+  border-color: rgba(103, 232, 249, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(236, 254, 255, 0.06),
+    0 22px 42px -32px rgba(34, 211, 238, 0.55);
+}
+
+.latency-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(125, 211, 252, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(125, 211, 252, 0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.28), transparent 70%);
+  pointer-events: none;
+}
+
+.latency-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes float-glow {
   0% {
     transform: translate3d(-2%, -2%, 0) scale(1);
