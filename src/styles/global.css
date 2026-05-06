@@ -141,6 +141,7 @@
     0 20px 36px -20px rgba(30, 41, 59, 0.72),
     0 0 0 1px rgba(56, 189, 248, 0.25),
     0 0 32px -18px rgba(99, 102, 241, 0.65);
+  isolation: isolate;
 }
 
 .progress-glow {
@@ -184,6 +185,25 @@
 
 .cyber-card:hover::after {
   transform: translateX(130%);
+}
+
+.cyber-card::selection {
+  background: transparent;
+}
+
+.cyber-card-active::before {
+  opacity: 0.56;
+}
+
+.cyber-card-active::after {
+  background:
+    linear-gradient(110deg, transparent 20%, rgba(125, 211, 252, 0.26) 44%, rgba(244, 114, 182, 0.24) 58%, transparent 78%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.02) 46%, transparent 72%);
+}
+
+.cyber-card-offline::before,
+.cyber-card-offline::after {
+  display: none;
 }
 
 .cyber-card-active {

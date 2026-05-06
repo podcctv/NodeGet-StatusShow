@@ -16,13 +16,16 @@ export function NodeCard({ node }: { node: Node }) {
   const logo = distroLogo(node)
   const virt = virtLabel(node)
   const cpu = cpuLabel(node)
+  const Wrapper = node.online ? 'a' : 'div'
+  const wrapperProps = node.online ? { href: `#${encodeURIComponent(node.uuid)}` } : {}
+
   return (
-    <a href={`#${encodeURIComponent(node.uuid)}`} className="block">
+    <Wrapper {...wrapperProps} className={cn('block', !node.online && 'cursor-default')}>
       <Card
         className={cn(
-          'p-4 transition duration-300 hover:border-primary/60 hover:-translate-y-1 hover:scale-[1.01] flex flex-col gap-2.5 cyber-card',
-          node.online && 'cyber-card-active',
-          !node.online && 'opacity-60',
+          'p-4 transition duration-300 flex flex-col gap-2.5 cyber-card',
+          node.online && 'hover:border-primary/60 hover:-translate-y-1 hover:scale-[1.01] cyber-card-active',
+          !node.online && 'opacity-60 pointer-events-none select-none cyber-card-offline',
         )}
       >
         <div className="cyber-orb" aria-hidden />
@@ -61,7 +64,7 @@ export function NodeCard({ node }: { node: Node }) {
           </div>
         )}
       </Card>
-    </a>
+    </Wrapper>
   )
 }
 function Metric({
