@@ -1,25 +1,35 @@
 import { Activity } from 'lucide-react'
 import { cn } from '../utils/cn'
 
-/** Traditional latency color thresholds */
-function barColor(avgMs: number | null): string {
-  if (avgMs == null) return 'bg-slate-800/60'
-  if (avgMs <= 80) return 'bg-emerald-400'
-  if (avgMs <= 150) return 'bg-yellow-400'
-  return 'bg-red-400'
-}
+/**
+ * Rainbow latency color scale — finer granularity for better readability.
+ * Uses inline style for precise HSL color rather than Tailwind classes.
+ */
+function barStyle(avgMs: number | null): React.CSSProperties {
+  if (avgMs == null) return { backgroundColor: 'rgba(51, 65, 85, 0.4)' } // slate-700/40
+  // HSL hue: 120 (green) → 60 (yellow) → 30 (orange) → 0 (red) → 330 (magenta)
+  // Map 0-500ms onto hue 120→330 (inverted: lower=greener, higher=redder/purple)
+  const clamped = Math.max(0, Math.min(500, avgMs))
+  let hue: number
+  if (clamped <= 50) hue = 142            // emerald
+  else if (clamped <= 100) hue = 142 - ((clamped - 50) / 50) * 42  // emerald→green-yellow (142→100)
+  else if (clamped <= 150) hue = 100 - ((clamped - 100) / 50) * 52 // green-yellow→yellow (100→48)
+  else if (clamped <= 200) hue = 48 - ((clamped - 150) / 50) * 18  // yellow→orange (48→30)
+  else if (clamped <= 300) hue = 30 - ((clamped - 200) / 100) * 22 // orange→red (30→8)
+  else hue = 8 - ((clamped - 300) / 200) * 8                        // red→deep-red (8→0)
 
-function barGlow(avgMs: number | null): string {
-  if (avgMs == null) return ''
-  if (avgMs <= 80) return 'shadow-[0_0_6px_rgba(52,211,153,0.5)]'
-  if (avgMs <= 150) return 'shadow-[0_0_6px_rgba(250,204,21,0.45)]'
-  return 'shadow-[0_0_6px_rgba(248,113,113,0.5)]'
+  const sat = clamped <= 100 ? 72 : 75
+  const light = clamped <= 50 ? 55 : clamped <= 200 ? 52 : 48
+  return { backgroundColor: `hsl(${hue}, ${sat}%, ${light}%)` }
 }
 
 function labelColor(avgMs: number | null): string {
   if (avgMs == null) return 'text-slate-500'
-  if (avgMs <= 80) return 'text-emerald-300'
+  if (avgMs <= 50) return 'text-emerald-400'
+  if (avgMs <= 100) return 'text-green-300'
   if (avgMs <= 150) return 'text-yellow-300'
+  if (avgMs <= 200) return 'text-orange-300'
+  if (avgMs <= 300) return 'text-red-400'
   return 'text-red-300'
 }
 
@@ -44,13 +54,13 @@ interface Props {
 export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
   const hasRows = rows.some(r => r.count > 0)
   return (
-    <div className="retro-terminal rounded-md border border-cyan-500/20 bg-slate-900/70 px-3 py-3 shadow-[inset_0_0_18px_rgba(15,23,42,0.45)]">
-      <div className="mb-3 flex items-center justify-between text-[11px] font-mono font-semibold tracking-wide text-cyan-100/85">
+    <div className="retro-terminal rounded-md border border-border/60 bg-black/20 px-3 py-3">
+      <div className="mb-3 flex items-center justify-between text-[11px] font-mono font-semibold tracking-wide text-foreground/70">
         <span className="inline-flex items-center gap-1.5">
-          <Activity className="h-3.5 w-3.5 text-lime-300" />
+          <Activity className="h-3.5 w-3.5 text-emerald-400" />
           三网 TCPing
         </span>
-        <span className="min-w-[42px] text-right text-[10px] text-slate-400">
+        <span className="min-w-[42px] text-right text-[10px] text-muted-foreground">
           {readable ? (hasRows ? 'LIVE' : loading ? 'SYNC' : 'NO DATA') : 'NO ACCESS'}
         </span>
       </div>
@@ -62,7 +72,6 @@ export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
             count: 0,
           }))
 
-          // Ensure exactly 24 slots
           const buckets: (number | null)[] = new Array(24).fill(null)
           for (const h of hourly) {
             if (h.hour >= 0 && h.hour < 24) {
@@ -72,21 +81,18 @@ export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
 
           return (
             <div key={item.name} className="grid grid-cols-[34px_1fr_48px] items-center gap-2">
-              <span className="text-[11px] font-medium text-cyan-200/80">
+              <span className="text-[11px] font-medium text-foreground/65">
                 {item.name}
               </span>
               <div
-                className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[2px] rounded-sm bg-slate-950/80 p-[3px]"
+                className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[2px] rounded-sm bg-black/40 p-[3px]"
                 title="24h 延迟热力图 · 每格=1小时"
               >
                 {buckets.map((avg, idx) => (
                   <span
                     key={idx}
-                    className={cn(
-                      'h-3 rounded-[1px] transition-colors duration-500',
-                      barColor(avg),
-                      barGlow(avg),
-                    )}
+                    className="h-3 rounded-[1px] transition-colors duration-500"
+                    style={barStyle(avg)}
                     title={avg != null ? `${idx}:00 — ${Math.round(avg)}ms` : `${idx}:00 — 无数据`}
                   />
                 ))}
@@ -95,7 +101,7 @@ export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
                 <div className={cn('text-[10px] font-semibold', labelColor(item.avg))}>
                   {item.avg == null ? '—' : `${Math.round(item.avg)}ms`}
                 </div>
-                <div className="text-[9px] text-slate-500">
+                <div className="text-[9px] text-muted-foreground">
                   {item.loss == null ? '—' : `${item.loss.toFixed(0)}%`}
                 </div>
               </div>

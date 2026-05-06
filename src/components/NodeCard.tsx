@@ -9,6 +9,7 @@ import {
   Server,
   type LucideIcon,
 } from 'lucide-react'
+import { useMemo } from 'react'
 import { Badge } from './ui/badge'
 import { Card } from './ui/card'
 import { Progress } from './ui/progress'
@@ -18,7 +19,7 @@ import type { HourlyBucket } from './FleetTcpPingPanel'
 import { bytes, pct, relativeAge, uptime } from '../utils/format'
 import { cpuLabel, deriveUsage, displayName, distroLogo, osLabel, virtLabel } from '../utils/derive'
 import { cn, loadColor, loadTextColor } from '../utils/cn'
-import type { Node } from '../types'
+import type { Node, TaskQueryResult } from '../types'
 import type { ReactNode } from 'react'
 
 const EMPTY_TCP_PING: Array<{ name: string; avg: number | null; loss: number | null; count: number; hourly?: HourlyBucket[] }> = [
@@ -27,16 +28,75 @@ const EMPTY_TCP_PING: Array<{ name: string; avg: number | null; loss: number | n
   { name: '联通', avg: null, loss: null, count: 0 },
 ]
 
+/* ── 24h Online Status (compact version of detail page's OnlinePanel) ── */
+
+type SlotState = 'online' | 'partial' | 'offline' | 'unknown'
+const SLOT_MS = 30 * 60 * 1000  // 30 minutes per slot
+const SLOT_COUNT = 48           // 48 slots = 24h
+
+function buildSlotStates(rows: TaskQueryResult[]): SlotState[] {
+  const now = Date.now()
+  const states: SlotState[] = []
+  for (let i = SLOT_COUNT - 1; i >= 0; i--) {
+    const start = now - (i + 1) * SLOT_MS
+    const end = now - i * SLOT_MS
+    const bucket = rows.filter(r => {
+      const ts = r.timestamp < 1_000_000_000_000 ? r.timestamp * 1000 : r.timestamp
+      return ts >= start && ts < end
+    })
+    if (!bucket.length) { states.push('unknown'); continue }
+    const fail = bucket.filter(r => !r.success).length
+    if (fail === 0) states.push('online')
+    else if (fail === bucket.length) states.push('offline')
+    else states.push('partial')
+  }
+  return states
+}
+
+const SLOT_COLORS: Record<SlotState, string> = {
+  online: 'bg-emerald-400/80',
+  partial: 'bg-yellow-400/80',
+  offline: 'bg-red-500/80',
+  unknown: 'bg-slate-700/30',
+}
+
+function OnlineStrip({ rows }: { rows: TaskQueryResult[] }) {
+  const states = useMemo(() => buildSlotStates(rows), [rows])
+  const known = states.filter(s => s !== 'unknown').length
+  const good = states.filter(s => s === 'online').length
+  const ratio = known ? Math.round((good / known) * 100) : null
+
+  return (
+    <div className="rounded-md border border-border/50 bg-black/15 px-2.5 py-2">
+      <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1.5">
+        <span>24h 在线</span>
+        <span className={ratio != null && ratio < 80 ? 'text-red-400' : ratio != null && ratio < 95 ? 'text-yellow-400' : 'text-emerald-400'}>
+          {ratio != null ? `${ratio}%` : '—'}
+        </span>
+      </div>
+      <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${SLOT_COUNT}, minmax(0,1fr))` }}>
+        {states.map((s, i) => (
+          <span key={i} className={cn('h-2 rounded-[1px]', SLOT_COLORS[s])} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── Main Card ── */
+
 export function NodeCard({
   node,
   tcpPing,
   tcpPingLoading,
   tcpPingReadable,
+  statusRows,
 }: {
   node: Node
   tcpPing?: Array<{ name: string; avg: number | null; loss: number | null; count: number; hourly?: HourlyBucket[] }>
   tcpPingLoading?: boolean
   tcpPingReadable?: boolean
+  statusRows?: TaskQueryResult[]
 }) {
   const u = deriveUsage(node)
   const tags = Array.isArray(node.meta?.tags) ? node.meta.tags : []
@@ -65,22 +125,22 @@ export function NodeCard({
         <div className="relative z-10 p-4 pb-3 flex flex-col flex-1">
           {/* Header */}
           <div className="flex items-start gap-3">
-            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-cyan-300/30 bg-black/25 shadow-[inset_0_0_18px_rgba(34,211,238,0.16)]">
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border/40 bg-black/25">
               {logo ? (
                 <img src={logo} alt="" className="h-7 w-7 object-contain" loading="lazy" />
               ) : (
-                <Server className="h-5 w-5 text-cyan-200" />
+                <Server className="h-5 w-5 text-muted-foreground" />
               )}
             </div>
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-wide text-slate-50" title={displayName(node)}>
+                <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-wide text-foreground" title={displayName(node)}>
                   {displayName(node)}
                 </span>
                 <Flag code={node.meta?.region} className="shrink-0" />
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[11px] font-mono uppercase tracking-wide text-cyan-100/65">
+              <div className="mt-1 flex items-center gap-2 text-[11px] font-mono uppercase tracking-wide text-muted-foreground">
                 {virt && <span className="truncate">{virt}</span>}
               </div>
             </div>
@@ -88,7 +148,7 @@ export function NodeCard({
 
           {/* System Info */}
           {(os || cpu) && (
-            <div className="mt-3.5 grid grid-cols-1 gap-1.5 rounded-md border border-white/10 bg-white/[0.045] px-3 py-2 text-[11px] font-mono text-slate-300/85">
+            <div className="mt-3.5 grid grid-cols-1 gap-1.5 rounded-md border border-border/40 bg-black/10 px-3 py-2 text-[11px] font-mono text-foreground/70">
               {os && <Info icon={Server}>{os}</Info>}
               {cpu && <Info icon={Cpu}>{cpu}</Info>}
             </div>
@@ -107,35 +167,44 @@ export function NodeCard({
             <StatBox icon={ArrowUp} label="UP">{bytes(u.netOut || 0)}/s</StatBox>
           </div>
 
-          {/* TCPing - this grows to fill space */}
-          <div className="mt-3.5 flex-1 flex flex-col justify-end">
+          {/* TCPing */}
+          <div className="mt-3.5">
             <FleetTcpPingPanel rows={tcpPingRows} loading={tcpPingLoading} readable={tcpPingReadable} />
           </div>
 
-          {/* Footer */}
-          <div className="mt-3.5 flex items-center gap-3 border-t border-cyan-300/20 pt-3 font-mono text-[11px] text-slate-300/80">
-            <Stat icon={Clock}>{uptime(u.uptime)}</Stat>
-            <span
-              className={cn(
-                'ml-auto truncate font-semibold tracking-wide',
-                node.online ? 'text-emerald-300' : 'text-rose-300',
-              )}
-              title={updated}
-            >
-              {updateState}
-            </span>
+          {/* 24h Online Status */}
+          {statusRows && statusRows.length > 0 && (
+            <div className="mt-3">
+              <OnlineStrip rows={statusRows} />
+            </div>
+          )}
+
+          {/* Footer - grows to push to bottom */}
+          <div className="mt-3.5 flex-1 flex items-end">
+            <div className="w-full flex items-center gap-3 border-t border-border/30 pt-3 font-mono text-[11px] text-muted-foreground">
+              <Stat icon={Clock}>{uptime(u.uptime)}</Stat>
+              <span
+                className={cn(
+                  'ml-auto truncate font-semibold tracking-wide',
+                  node.online ? 'text-emerald-400' : 'text-rose-400',
+                )}
+                title={updated}
+              >
+                {updateState}
+              </span>
+            </div>
           </div>
 
           {/* Tags */}
           {tags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {tags.slice(0, 4).map(t => (
-                <Badge key={t} variant="outline" className="border-cyan-300/25 bg-cyan-300/5 text-[10px] text-cyan-100">
+                <Badge key={t} variant="outline" className="border-border/40 bg-muted/30 text-[10px] text-foreground/70">
                   {t}
                 </Badge>
               ))}
               {tags.length > 4 && (
-                <Badge variant="outline" className="border-cyan-300/20 bg-cyan-300/5 text-[10px] text-cyan-100/70">
+                <Badge variant="outline" className="border-border/30 bg-muted/30 text-[10px] text-foreground/50">
                   +{tags.length - 4}
                 </Badge>
               )}
@@ -150,7 +219,7 @@ export function NodeCard({
 function Info({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      <Icon className="h-3.5 w-3.5 shrink-0 text-cyan-200/75" />
+      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span className="truncate">{children}</span>
     </span>
   )
@@ -166,19 +235,21 @@ function Metric({
   value?: number | null
 }) {
   const numericValue = Number.isFinite(value) ? (value as number) : undefined
+  // Clamp display to 100% for the progress bar, but show real value in text
+  const clampedForBar = numericValue != null ? Math.min(100, numericValue) : undefined
   const percent = pct(numericValue)
   return (
-    <div className="rounded-md border border-cyan-300/15 bg-black/20 p-2 shadow-[inset_0_0_20px_rgba(15,23,42,0.36)]">
+    <div className="rounded-md border border-border/30 bg-black/15 p-2">
       <div className="mb-1.5 flex items-center justify-between gap-1">
-        <span className="flex items-center gap-1 text-[10px] font-mono text-cyan-100/60">
+        <span className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
           <Icon className="h-3 w-3" />
           {label}
         </span>
         <span className={cn('font-mono text-[11px] font-semibold tabular-nums', loadTextColor(numericValue))}>{percent}</span>
       </div>
       <Progress
-        value={numericValue}
-        className="h-1.5 rounded-sm bg-slate-950/80 ring-1 ring-white/10"
+        value={clampedForBar}
+        className="h-1.5 rounded-sm bg-slate-950/60 ring-1 ring-white/5"
         indicatorClassName={cn(loadColor(numericValue), 'progress-glow')}
       />
     </div>
@@ -187,12 +258,12 @@ function Metric({
 
 function StatBox({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-2">
-      <div className="mb-1 flex items-center gap-1 text-[10px] text-cyan-100/55">
+    <div className="rounded-md border border-border/30 bg-black/10 px-2.5 py-2">
+      <div className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
         <Icon className="h-3 w-3" />
         {label}
       </div>
-      <div className="truncate text-slate-100">{children}</div>
+      <div className="truncate text-foreground">{children}</div>
     </div>
   )
 }

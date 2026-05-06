@@ -228,6 +228,7 @@ export function App() {
                 tcpPing={fleetTcpPing.byUuid.get(n.uuid)}
                 tcpPingLoading={fleetTcpPing.loading}
                 tcpPingReadable={fleetTcpPing.readable}
+                statusRows={fleetTcpPing.rawByUuid.get(n.uuid)}
               />
             ))}
           </div>

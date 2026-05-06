@@ -153,6 +153,17 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
     }
   }, [pool, uuidKey])
 
+  // Raw rows per UUID — for online status strip (includes success AND failure rows)
+  const rawByUuid = useMemo(() => {
+    const map = new Map<string, TaskQueryResult[]>()
+    for (const row of rows) {
+      const list = map.get(row.uuid) ?? []
+      list.push(row)
+      map.set(row.uuid, list)
+    }
+    return map
+  }, [rows])
+
   const byUuid = useMemo(() => {
     const nodeMap = new Map<string, TaskQueryResult[]>()
     for (const row of rows) {
@@ -207,5 +218,5 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
     })
   }, [rows])
 
-  return { carriers, byUuid, loading, readable, hasData: rows.length > 0 }
+  return { carriers, byUuid, rawByUuid, loading, readable, hasData: rows.length > 0 }
 }
