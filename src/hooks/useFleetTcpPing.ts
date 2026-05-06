@@ -109,20 +109,20 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
         return results
       }
 
-      // Query per UUID with concurrency to guarantee full history even if timestamp_from_to is unsupported
+      // Query per UUID sequentially (concurrency=1) to prevent backend throttling
       const jobs: (() => Promise<TaskQueryResult[]>)[] = []
       for (const uuid of uuidSet) {
         for (const entry of pool.entries) {
           jobs.push(() => taskQuery(
             entry.client,
-            // Provide both time window and fallback limit per node
-            [{ uuid }, { timestamp_from_to: dayWindow }, { type: 'tcp_ping' }, { limit: 500 }],
+            // Provide both time window and a high fallback limit per node (5000 is enough for 24h even at 1 ping/min)
+            [{ uuid }, { timestamp_from_to: dayWindow }, { type: 'tcp_ping' }, { limit: 5000 }],
             QUERY_TIMEOUT_MS,
           ))
         }
       }
 
-      const settled = await executeBatched(jobs, 15) // Max 15 concurrent requests
+      const settled = await executeBatched(jobs, 1) // Concurrency: 1 (Sequential)
       if (cancelled) return
 
       const denied = settled.some(
