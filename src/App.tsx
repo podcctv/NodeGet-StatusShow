@@ -12,7 +12,7 @@ import { NodeDetail } from './components/NodeDetail'
 import { WorldMap } from './components/WorldMap'
 import { TagFilter } from './components/TagFilter'
 import { RegionFilter } from './components/RegionFilter'
-import { FleetTcpPingPanel } from './components/FleetTcpPingPanel'
+import { useFleetTcpPing } from './hooks/useFleetTcpPing'
 import { deriveUsage, displayName } from './utils/derive'
 import type { Sort, View } from './types'
 
@@ -157,6 +157,7 @@ export function App() {
   }, [nodes, query, activeTag, activeRegion, sort, regions])
 
   const selectedNode = selected ? nodes.get(selected) || [...nodes.values()].find(n => n.uuid === selected) || null : null
+  const fleetTcpPing = useFleetTcpPing(pool, list)
 
   if (configError) {
     return (
@@ -207,8 +208,6 @@ export function App() {
         )}
         {!empty && <TagFilter tags={allTags} active={activeTag} onChange={setActiveTag} />}
 
-        {!empty && view === 'cards' && <FleetTcpPingPanel pool={pool} nodes={list} />}
-
         {empty && !hasErrors && (
           <div className="py-24 flex flex-col items-center gap-3 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -223,7 +222,13 @@ export function App() {
         {!empty && view === 'cards' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {list.map(n => (
-              <NodeCard key={n.uuid} node={n} />
+              <NodeCard
+                key={n.id}
+                node={n}
+                tcpPing={fleetTcpPing.byUuid.get(n.uuid)}
+                tcpPingLoading={fleetTcpPing.loading}
+                tcpPingReadable={fleetTcpPing.readable}
+              />
             ))}
           </div>
         )}
