@@ -1,5 +1,5 @@
 import type { RpcClient } from './client'
-import type { DynamicSummary, StaticData, TaskQueryCondition, TaskQueryResult } from '../types'
+import type { DynamicSummary, StaticData, TaskCreateBlockingResult, TaskQueryCondition, TaskQueryResult } from '../types'
 
 export const listAgentUuids = (c: RpcClient) =>
   c.call<{ uuids?: string[] }>('nodeget-server_list_all_agent_uuid', {}).then(r => r?.uuids || [])
@@ -20,3 +20,14 @@ export const taskQuery = (
   conditions: TaskQueryCondition[],
   timeoutMs?: number,
 ) => c.call<TaskQueryResult[]>('task_query', { task_data_query: { condition: conditions } }, timeoutMs)
+
+export const taskCreateBlocking = (
+  c: RpcClient,
+  uuid: string,
+  taskType: Record<string, unknown>,
+  timeoutMs = 8000,
+) => c.call<TaskCreateBlockingResult>(
+  'task_create_task_blocking',
+  { target_uuid: uuid, task_type: taskType, timeout_ms: timeoutMs },
+  timeoutMs + 1000,
+)

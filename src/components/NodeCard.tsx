@@ -27,6 +27,7 @@ export function NodeCard({ node }: { node: Node }) {
   const virt = virtLabel(node)
   const cpu = cpuLabel(node)
   const updated = relativeAge(u.ts)
+  const updateState = node.online ? 'ONLINE' : 'OFFLINE'
   const Wrapper = node.online ? 'a' : 'div'
   const wrapperProps = node.online ? { href: `#${encodeURIComponent(node.id)}` } : {}
 
@@ -90,7 +91,15 @@ export function NodeCard({ node }: { node: Node }) {
 
           <div className="flex items-center gap-3 border-t border-cyan-300/20 pt-3 font-mono text-[11px] text-slate-300/80">
             <Stat icon={Clock}>{uptime(u.uptime)}</Stat>
-            <span className="ml-auto truncate" title={updated}>{updated}</span>
+            <span
+              className={cn(
+                'ml-auto truncate font-semibold tracking-wide',
+                node.online ? 'text-emerald-300' : 'text-rose-300',
+              )}
+              title={updated}
+            >
+              {updateState}
+            </span>
           </div>
 
           {tags.length > 0 && (

@@ -108,6 +108,16 @@ export interface TaskQueryResult {
   task_event_result: Record<string, unknown> | null
 }
 
+export interface TaskCreateBlockingResult {
+  task_id: number
+  agent_uuid: string
+  task_token?: string
+  timestamp: number
+  success: boolean
+  error_message?: string | null
+  task_event_result: Record<string, unknown> | null
+}
+
 export interface TaskQueryCondition {
   task_id?: number
   uuid?: string
