@@ -8,7 +8,6 @@ export interface BackendToken {
 
 export interface PoolEntry {
   name: string
-  backend_url: string
   client: RpcClient
 }
 
@@ -18,7 +17,6 @@ export class BackendPool {
   constructor(tokens: BackendToken[]) {
     this.entries = tokens.map(t => ({
       name: t.name,
-      backend_url: t.backend_url,
       client: new RpcClient(t.backend_url, t.token, t.name),
     }))
   }

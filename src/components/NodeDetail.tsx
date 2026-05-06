@@ -73,7 +73,15 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
     return () => el.removeEventListener('scroll', onScroll)
   }, [node])
 
-  const { pingData, tcpData, statusData, loading: latencyLoading, error: latencyError } = useNodeLatency(
+  const {
+    pingData,
+    tcpData,
+    statusData,
+    loading: latencyLoading,
+    pingError,
+    tcpError,
+    taskReadable,
+  } = useNodeLatency(
     pool,
     node?.source ?? null,
     node?.uuid ?? null,
@@ -206,19 +214,25 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
               <OnlinePanel rows={statusData} loading={latencyLoading} nodeOnline={node.online} />
             </div>
             <div className="xl:col-span-2">
-              <TcpMiniPanel rows={tcpData} />
+              <TcpMiniPanel rows={tcpData} taskReadable={taskReadable} />
             </div>
           </div>
         </Section>
 
-        <LatencyBlock
-          title="TCP Ping"
-          rows={tcpData}
-          type="tcp_ping"
-          loading={latencyLoading}
-          error={latencyError}
-        />
-        <LatencyBlock title="Ping" rows={pingData} type="ping" loading={latencyLoading} error={latencyError} />
+        {taskReadable ? (
+          <>
+            <LatencyBlock
+              title="TCP Ping"
+              rows={tcpData}
+              type="tcp_ping"
+              loading={latencyLoading}
+              error={tcpError}
+            />
+            <LatencyBlock title="Ping" rows={pingData} type="ping" loading={latencyLoading} error={pingError} />
+          </>
+        ) : (
+          <TaskUnsupportedPanel />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-8">
           <Section title="系统">
@@ -336,7 +350,7 @@ function OnlinePanel({
   )
 }
 
-function TcpMiniPanel({ rows }: { rows: TaskQueryResult[] }) {
+function TcpMiniPanel({ rows, taskReadable }: { rows: TaskQueryResult[]; taskReadable: boolean }) {
   const stats = useMemo(() => computeLatencyStats(rows, 'tcp_ping').slice(0, 5), [rows])
   return (
     <div className="rounded-xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/10 via-sky-500/5 to-slate-950 p-4 space-y-2.5">
@@ -358,8 +372,23 @@ function TcpMiniPanel({ rows }: { rows: TaskQueryResult[] }) {
           </div>
         </div>
       ))}
-      {stats.length === 0 && <div className="text-xs text-muted-foreground">暂无 TCP ping 数据</div>}
+      {stats.length === 0 && (
+        <div className="text-xs text-muted-foreground">
+          {taskReadable ? '暂无 TCP ping 数据' : '当前 Token 未开放任务探测数据'}
+        </div>
+      )}
     </div>
+  )
+}
+
+function TaskUnsupportedPanel() {
+  return (
+    <Section title="探测数据">
+      <div className="min-h-36 flex flex-col items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+        <div>当前 Token 未开放 Task Read 权限，无法读取 Ping / TCP Ping 任务历史。</div>
+        <div>页面已使用动态监控数据判断在线状态；如需延迟曲线，请给前端 Token 增加 Task Read: ping / tcp_ping。</div>
+      </div>
+    </Section>
   )
 }
 
