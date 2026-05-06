@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { taskQuery } from '../api/methods'
-import { computeLatencyStats, latencySeriesName, latencyValue } from '../utils/latency'
+import { computeLatencyStats, latencySeriesName, latencyTaskType, latencyValue } from '../utils/latency'
 import type { BackendPool } from '../api/pool'
 import type { Node, TaskQueryResult } from '../types'
 import type { HourlyBucket } from '../components/FleetTcpPingPanel'
 
 const REFRESH_MS = 60_000
 const QUERY_TIMEOUT_MS = 15_000
-const PER_NODE_LIMIT = 24
+/** Limit for the typed query (type: tcp_ping) */
+const TYPED_LIMIT = 100
+/** Limit for the untyped fallback query (all task types) */
+const FALLBACK_LIMIT = 60
 const MAX_NODES = 160
 
 function clean(rows: TaskQueryResult[] | undefined): TaskQueryResult[] {
@@ -32,6 +35,18 @@ function mergeRows(groups: TaskQueryResult[][]) {
 
 function normalizeTs(ts: number) {
   return ts < 1_000_000_000_000 ? ts * 1000 : ts
+}
+
+/**
+ * Check if a row matches tcp_ping — mirrors the detail page's matchesLatencyType logic.
+ * First checks the task_event_type label, then falls back to checking if we can
+ * extract a latency value from the result.
+ */
+function isTcpPingRow(row: TaskQueryResult): boolean {
+  const taskType = latencyTaskType(row)
+  if (taskType) return taskType === 'tcp_ping'
+  // Fallback: if no explicit type, check if we can extract a tcp_ping value
+  return latencyValue(row, 'tcp_ping') != null
 }
 
 /** Compute hourly buckets (24 hours) from task query results */
@@ -80,14 +95,26 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
 
     const fetchOnce = async () => {
       setLoading(true)
+
+      // For each node fire TWO queries:
+      //   1) typed:   { type: 'tcp_ping', limit: TYPED_LIMIT }   — fast path
+      //   2) untyped: { limit: FALLBACK_LIMIT }                   — fallback for backends
+      //      that don't support the type condition filter
       const jobs = ids.flatMap(({ source, uuid }) => {
         const entry = pool.entries.find(e => e.name === source)
         if (!entry) return []
-        return taskQuery(
-          entry.client,
-          [{ uuid }, { type: 'tcp_ping' }, { limit: PER_NODE_LIMIT }],
-          QUERY_TIMEOUT_MS,
-        )
+        return [
+          taskQuery(
+            entry.client,
+            [{ uuid }, { type: 'tcp_ping' }, { limit: TYPED_LIMIT }],
+            QUERY_TIMEOUT_MS,
+          ),
+          taskQuery(
+            entry.client,
+            [{ uuid }, { limit: FALLBACK_LIMIT }],
+            QUERY_TIMEOUT_MS,
+          ),
+        ]
       })
 
       const settled = await Promise.allSettled(jobs)
@@ -97,7 +124,11 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
         r => r.status === 'rejected' && /permission denied|missing task/i.test(r.reason instanceof Error ? r.reason.message : String(r.reason)),
       )
       setReadable(!denied)
-      const nextRows = mergeRows(settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []))
+
+      // Merge all results, then client-side filter for tcp_ping rows only
+      const allRows = mergeRows(settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []))
+      const nextRows = allRows.filter(isTcpPingRow)
+
       setRows(prev => nextRows.length ? nextRows : prev)
       setLoading(false)
     }
