@@ -6,12 +6,11 @@ import type { Node, TaskQueryResult } from '../types'
 import type { HourlyBucket } from '../components/FleetTcpPingPanel'
 
 const REFRESH_MS = 60_000
-const QUERY_TIMEOUT_MS = 15_000
-/** Limit for the typed query (type: tcp_ping) */
-const TYPED_LIMIT = 100
-/** Limit for the untyped fallback query (all task types) */
-const FALLBACK_LIMIT = 60
+const QUERY_TIMEOUT_MS = 20_000
 const MAX_NODES = 160
+const DAY_MS = 24 * 60 * 60 * 1000
+/** Max results for the global (no-uuid) query */
+const GLOBAL_LIMIT = 5000
 
 function clean(rows: TaskQueryResult[] | undefined): TaskQueryResult[] {
   return (rows ?? [])
@@ -38,14 +37,12 @@ function normalizeTs(ts: number) {
 }
 
 /**
- * Check if a row matches tcp_ping — mirrors the detail page's matchesLatencyType logic.
- * First checks the task_event_type label, then falls back to checking if we can
- * extract a latency value from the result.
+ * Client-side filter: keep only rows that look like tcp_ping tasks.
+ * Mirrors detail page's matchesLatencyType logic.
  */
 function isTcpPingRow(row: TaskQueryResult): boolean {
   const taskType = latencyTaskType(row)
   if (taskType) return taskType === 'tcp_ping'
-  // Fallback: if no explicit type, check if we can extract a tcp_ping value
   return latencyValue(row, 'tcp_ping') != null
 }
 
@@ -82,52 +79,60 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
   const [loading, setLoading] = useState(false)
   const [readable, setReadable] = useState(true)
 
-  const ids = useMemo(
-    () => nodes.slice(0, MAX_NODES).map(n => ({ source: n.source, uuid: n.uuid })),
+  // Set of known UUIDs for filtering
+  const uuidSet = useMemo(
+    () => new Set(nodes.slice(0, MAX_NODES).map(n => n.uuid)),
     [nodes],
   )
-  const idsKey = useMemo(() => ids.map(id => `${id.source}:${id.uuid}`).join('|'), [ids])
+  const uuidKey = useMemo(() => [...uuidSet].sort().join('|'), [uuidSet])
 
   useEffect(() => {
     setReadable(true)
-    if (!pool || !ids.length) return
+    if (!pool || !uuidSet.size) return
     let cancelled = false
 
     const fetchOnce = async () => {
       setLoading(true)
+      const now = Date.now()
+      const dayWindow: [number, number] = [now - DAY_MS, now]
 
-      // For each node fire TWO queries:
-      //   1) typed:   { type: 'tcp_ping', limit: TYPED_LIMIT }   — fast path
-      //   2) untyped: { limit: FALLBACK_LIMIT }                   — fallback for backends
-      //      that don't support the type condition filter
-      const jobs = ids.flatMap(({ source, uuid }) => {
-        const entry = pool.entries.find(e => e.name === source)
-        if (!entry) return []
-        return [
-          taskQuery(
-            entry.client,
-            [{ uuid }, { type: 'tcp_ping' }, { limit: TYPED_LIMIT }],
-            QUERY_TIMEOUT_MS,
-          ),
-          taskQuery(
-            entry.client,
-            [{ uuid }, { limit: FALLBACK_LIMIT }],
-            QUERY_TIMEOUT_MS,
-          ),
-        ]
-      })
+      // Strategy: query ALL tcp_ping tasks globally (no uuid filter) per backend.
+      // This avoids N per-node queries and gets all data in 2-3 calls per backend.
+      // Then filter client-side by known UUIDs.
+      const jobs = pool.entries.flatMap(entry => [
+        // 1) All tcp_ping tasks in the last 24h (most reliable)
+        taskQuery(
+          entry.client,
+          [{ timestamp_from_to: dayWindow }, { type: 'tcp_ping' }],
+          QUERY_TIMEOUT_MS,
+        ),
+        // 2) Recent tcp_ping by limit (fallback for backends without time filter)
+        taskQuery(
+          entry.client,
+          [{ type: 'tcp_ping' }, { limit: GLOBAL_LIMIT }],
+          QUERY_TIMEOUT_MS,
+        ),
+        // 3) All recent tasks without type filter (fallback for backends without type support)
+        taskQuery(
+          entry.client,
+          [{ timestamp_from_to: dayWindow }, { limit: GLOBAL_LIMIT }],
+          QUERY_TIMEOUT_MS,
+        ),
+      ])
 
       const settled = await Promise.allSettled(jobs)
       if (cancelled) return
 
       const denied = settled.some(
-        r => r.status === 'rejected' && /permission denied|missing task/i.test(r.reason instanceof Error ? r.reason.message : String(r.reason)),
+        r => r.status === 'rejected' && /permission denied|missing task/i.test(
+          r.reason instanceof Error ? r.reason.message : String(r.reason),
+        ),
       )
       setReadable(!denied)
 
-      // Merge all results, then client-side filter for tcp_ping rows only
+      // Merge, filter by tcp_ping type, then filter by known UUIDs
       const allRows = mergeRows(settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []))
-      const nextRows = allRows.filter(isTcpPingRow)
+      const nextRows = allRows.filter(r => isTcpPingRow(r) && uuidSet.has(r.uuid))
 
       setRows(prev => nextRows.length ? nextRows : prev)
       setLoading(false)
@@ -139,7 +144,7 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       cancelled = true
       clearInterval(timer)
     }
-  }, [pool, idsKey])
+  }, [pool, uuidKey])
 
   const byUuid = useMemo(() => {
     const nodeMap = new Map<string, TaskQueryResult[]>()
