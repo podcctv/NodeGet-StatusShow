@@ -38,9 +38,9 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
     () => nodes.filter(n => n.online).slice(0, MAX_NODES).map(n => ({ source: n.source, uuid: n.uuid })),
     [nodes],
   )
+  const idsKey = useMemo(() => ids.map(id => `${id.source}:${id.uuid}`).join('|'), [ids])
 
   useEffect(() => {
-    setRows([])
     setReadable(true)
     if (!pool || !ids.length) return
     let cancelled = false
@@ -64,7 +64,8 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
         r => r.status === 'rejected' && /permission denied|missing task/i.test(r.reason instanceof Error ? r.reason.message : String(r.reason)),
       )
       setReadable(!denied)
-      setRows(mergeRows(settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : [])))
+      const nextRows = mergeRows(settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []))
+      setRows(prev => nextRows.length ? nextRows : prev)
       setLoading(false)
     }
 
@@ -74,7 +75,7 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       cancelled = true
       clearInterval(timer)
     }
-  }, [pool, ids])
+  }, [pool, idsKey])
 
   const byUuid = useMemo(() => {
     const nodeMap = new Map<string, TaskQueryResult[]>()

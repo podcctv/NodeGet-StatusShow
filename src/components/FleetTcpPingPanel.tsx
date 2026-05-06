@@ -25,7 +25,7 @@ export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
     <div className="rounded-md border border-cyan-300/15 bg-black/20 px-3 py-2 shadow-[inset_0_0_18px_rgba(34,211,238,0.06)]">
       <div className="mb-2 flex items-center justify-between text-[10px] font-mono uppercase tracking-wide text-cyan-100/60">
         <span>TCP 三网 Ping</span>
-        <span>{readable ? (hasRows ? 'LIVE' : loading ? 'SYNC' : 'NO DATA') : 'NO ACCESS'}</span>
+        <span className="min-w-[42px] text-right">{readable ? (hasRows ? 'LIVE' : loading ? 'SYNC' : 'NO DATA') : 'NO ACCESS'}</span>
       </div>
       <div className="space-y-1.5">
         {rows.map(item => {
@@ -37,7 +37,7 @@ export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
                 <Activity className="h-3 w-3" />
                 {item.name}
               </span>
-              <Progress value={pct} className="h-1.5 rounded-sm bg-slate-950/80" indicatorClassName={cn(style.bar, 'progress-glow')} />
+              <Progress value={pct} className="h-1.5 rounded-sm bg-slate-950/80" indicatorClassName={cn(style.bar, 'progress-glow transition-[width] duration-500 ease-out')} />
               <span className="text-right font-mono text-[10px] text-cyan-50">
                 {item.avg == null ? '—' : `${Math.round(item.avg)}ms`}
               </span>
