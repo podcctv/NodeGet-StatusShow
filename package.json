@@ -8,6 +8,7 @@
     "prebuild": "node scripts/build-config.mjs",
     "build": "vite build",
     "preview": "vite preview",
+    "deploy:cf": "npm run build && npx wrangler deploy",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
