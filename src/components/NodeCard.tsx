@@ -12,7 +12,6 @@ import {
 import { useMemo } from 'react'
 import { Badge } from './ui/badge'
 import { Card } from './ui/card'
-import { Progress } from './ui/progress'
 import { Flag } from './Flag'
 import { FleetTcpPingPanel } from './FleetTcpPingPanel'
 import type { HourlyBucket } from './FleetTcpPingPanel'
@@ -250,11 +249,21 @@ function Metric({
         </span>
         <span className={cn('font-mono text-[11px] font-semibold tabular-nums', loadTextColor(numericValue))}>{percent}</span>
       </div>
-      <Progress
-        value={clampedForBar}
-        className="h-1.5 rounded-sm bg-black/10 dark:bg-slate-950/60 ring-1 ring-black/5 dark:ring-white/5"
-        indicatorClassName={cn(loadColor(numericValue), 'progress-glow')}
-      />
+      <div className="flex gap-[2px] h-1.5 mt-2">
+        {Array.from({ length: 20 }).map((_, i) => {
+          const threshold = i * 5 // 5% per block
+          const isFilled = numericValue != null && numericValue > threshold
+          return (
+            <div
+              key={i}
+              className={cn(
+                "flex-1 rounded-sm",
+                isFilled ? loadColor(numericValue) : "bg-black/10 dark:bg-white/10"
+              )}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
