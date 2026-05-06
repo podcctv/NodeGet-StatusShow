@@ -392,9 +392,9 @@ function TaskUnsupportedPanel() {
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <Card className="p-5">
+    <Card className={cn('p-5', className)}>
       <div className="text-xs uppercase tracking-wide text-muted-foreground mb-3">{title}</div>
       {children}
     </Card>
@@ -527,8 +527,8 @@ function LatencyBlock({ title, rows, type, loading, error }: LatencyBlockProps) 
     })
 
   return (
-    <Section title={`${title} · 近 1 小时`}>
-      <div className="relative h-52 sm:h-60">
+    <Section title={`${title} · 近 1 小时`} className="latency-panel">
+      <div className="relative h-56 sm:h-64 rounded-md border border-cyan-300/10 bg-black/20 p-2">
         {empty && (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
             {loading ? '加载中…' : error ? `暂无 ${type} 数据 · ${error}` : `暂无 ${type} 数据`}
@@ -579,14 +579,14 @@ function LatencyBlock({ title, rows, type, loading, error }: LatencyBlockProps) 
       </div>
 
       {stats.length > 0 && (
-        <div className="mt-3 border-t pt-3 overflow-x-auto">
-          <div className="flex items-center min-w-[340px] px-2 pb-1 text-[11px] text-muted-foreground">
-            <span className="flex-1">来源</span>
-            <span className="w-20 text-right">平均延迟</span>
-            <span className="w-16 text-right">抖动</span>
-            <span className="w-14 text-right">丢包率</span>
+        <div className="mt-4 border-t border-cyan-300/15 pt-3 overflow-x-auto">
+          <div className="grid min-w-[520px] grid-cols-[1fr_88px_80px_70px] gap-3 px-2 pb-2 text-[11px] text-cyan-100/55">
+            <span>来源</span>
+            <span className="text-right">平均延迟</span>
+            <span className="text-right">抖动</span>
+            <span className="text-right">丢包率</span>
           </div>
-          <div className="space-y-0.5 min-w-[340px]">
+          <div className="space-y-1 min-w-[520px]">
             {stats.map(s => (
               <LatencyStatsRow
                 key={s.name}
@@ -617,26 +617,26 @@ function LatencyStatsRow({
     <div
       onClick={onToggle}
       className={cn(
-        'flex items-center px-2 py-1 rounded-md text-xs cursor-pointer select-none transition-opacity hover:bg-muted/60',
+        'grid grid-cols-[1fr_88px_80px_70px] items-center gap-3 rounded-md border border-cyan-300/10 bg-white/[0.025] px-2 py-2 text-xs cursor-pointer select-none transition hover:bg-cyan-300/5',
         hidden && 'opacity-35',
       )}
     >
-      <span className="flex items-center gap-2 flex-1 min-w-0">
+      <span className="flex items-center gap-2 min-w-0 font-semibold">
         <span
-          className="inline-block w-4 h-0.5 rounded-full shrink-0"
+          className="inline-block w-5 h-0.5 rounded-full shrink-0 shadow-[0_0_10px_currentColor]"
           style={{ background: color }}
         />
         <span className="truncate">{name}</span>
       </span>
-      <span className="w-20 text-right tabular-nums font-mono">
+      <span className="text-right tabular-nums font-mono text-cyan-50">
         {avg != null ? ms(avg) : '—'}
       </span>
-      <span className="w-16 text-right tabular-nums font-mono">
+      <span className="text-right tabular-nums font-mono">
         {jitter != null ? ms(jitter) : '—'}
       </span>
       <span
         className={cn(
-          'w-14 text-right tabular-nums font-mono',
+          'text-right tabular-nums font-mono',
           lossRate >= 5 && 'text-red-500 font-medium',
         )}
       >

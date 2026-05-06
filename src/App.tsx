@@ -12,6 +12,7 @@ import { NodeDetail } from './components/NodeDetail'
 import { WorldMap } from './components/WorldMap'
 import { TagFilter } from './components/TagFilter'
 import { RegionFilter } from './components/RegionFilter'
+import { FleetTcpPingPanel } from './components/FleetTcpPingPanel'
 import { deriveUsage, displayName } from './utils/derive'
 import type { Sort, View } from './types'
 
@@ -205,6 +206,8 @@ export function App() {
           />
         )}
         {!empty && <TagFilter tags={allTags} active={activeTag} onChange={setActiveTag} />}
+
+        {!empty && view === 'cards' && <FleetTcpPingPanel pool={pool} nodes={list} />}
 
         {empty && !hasErrors && (
           <div className="py-24 flex flex-col items-center gap-3 text-muted-foreground">
