@@ -9,7 +9,7 @@ const QUERY_TIMEOUT_MS = 20_000
 
 function clean(rows: TaskQueryResult[] | undefined): TaskQueryResult[] {
   return (rows ?? [])
-    .filter(r => r.cron_source && r.cron_source !== '未知')
+    .filter(r => r && r.timestamp)
     .sort((a, b) => a.timestamp - b.timestamp)
 }
 

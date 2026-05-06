@@ -21,6 +21,20 @@ function normalizeTs(ts: number) {
   return ts < 1_000_000_000_000 ? ts * 1000 : ts
 }
 
+export function latencySeriesName(row: TaskQueryResult) {
+  const source = typeof row.cron_source === 'string' ? row.cron_source.trim() : ''
+  if (source && source !== '未知') return source
+
+  const event = row.task_event_type
+  if (event && typeof event === 'object') {
+    const payload = event as Record<string, unknown>
+    const target = payload.tcp_ping ?? payload.ping
+    if (typeof target === 'string' && target.trim()) return target.trim()
+  }
+
+  return row.task_id ? `任务 #${row.task_id}` : '未知来源'
+}
+
 function pickValue(row: TaskQueryResult, type: LatencyType): number | null {
   if (!row.success) return null
   const payload = row.task_event_result
@@ -62,7 +76,7 @@ function pickValue(row: TaskQueryResult, type: LatencyType): number | null {
 
 function seriesNames(rows: TaskQueryResult[]) {
   const set = new Set<string>()
-  for (const r of rows) set.add(r.cron_source || '未知')
+  for (const r of rows) set.add(latencySeriesName(r))
   return [...set].sort((a, b) => a.localeCompare(b))
 }
 
@@ -101,7 +115,7 @@ export function buildLatencyChart(rows: TaskQueryResult[], type: LatencyType) {
       for (const n of names) pt[n] = null
       byTs.set(t, pt)
     }
-    pt[r.cron_source || '未知'] = pickValue(r, type)
+    pt[latencySeriesName(r)] = pickValue(r, type)
   }
 
   const data = [...byTs.values()].sort((a, b) => a.t - b.t)
@@ -119,7 +133,7 @@ export interface LatencyStats {
 
 export function computeLatencyStats(rows: TaskQueryResult[], type: LatencyType): LatencyStats[] {
   const stats = seriesNames(rows).map<LatencyStats>(name => {
-    const list = rows.filter(r => (r.cron_source || '未知') === name)
+    const list = rows.filter(r => latencySeriesName(r) === name)
     const vals: number[] = []
     for (const r of list) {
       const v = pickValue(r, type)

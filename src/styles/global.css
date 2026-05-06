@@ -132,15 +132,15 @@
   position: relative;
   overflow: hidden;
   background:
-    linear-gradient(152deg, rgba(11, 23, 54, 0.92), rgba(34, 22, 73, 0.86)),
-    radial-gradient(circle at top right, rgba(0, 224, 255, 0.2), transparent 48%),
-    radial-gradient(circle at 12% 90%, rgba(244, 114, 182, 0.2), transparent 42%);
-  border-color: rgba(125, 211, 252, 0.35);
+    linear-gradient(145deg, rgba(8, 18, 40, 0.96), rgba(15, 23, 42, 0.94) 46%, rgba(27, 25, 53, 0.92)),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.12), transparent 28%, rgba(52, 211, 153, 0.08) 70%, rgba(244, 63, 94, 0.10));
+  border-color: rgba(103, 232, 249, 0.26);
   box-shadow:
-    inset 0 1px 0 rgba(187, 247, 255, 0.08),
-    0 20px 36px -20px rgba(30, 41, 59, 0.72),
-    0 0 0 1px rgba(56, 189, 248, 0.25),
-    0 0 32px -18px rgba(99, 102, 241, 0.65);
+    inset 0 1px 0 rgba(236, 254, 255, 0.08),
+    inset 0 -1px 0 rgba(34, 211, 238, 0.08),
+    0 18px 36px -22px rgba(2, 6, 23, 0.9),
+    0 0 0 1px rgba(34, 211, 238, 0.14),
+    0 0 32px -20px rgba(45, 212, 191, 0.85);
   isolation: isolate;
 }
 
@@ -161,11 +161,11 @@
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(130deg, rgba(56, 189, 248, 0.5), rgba(59, 130, 246, 0), rgba(34, 197, 94, 0.45));
+  background: linear-gradient(120deg, rgba(103, 232, 249, 0.65), rgba(56, 189, 248, 0.05) 34%, rgba(52, 211, 153, 0.48) 72%, rgba(251, 113, 133, 0.45));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  opacity: 0.42;
+  opacity: 0.52;
   pointer-events: none;
 }
 
@@ -173,7 +173,9 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, transparent 20%, rgba(125, 211, 252, 0.24) 44%, rgba(244, 114, 182, 0.22) 58%, transparent 78%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 28%),
+    linear-gradient(110deg, transparent 24%, rgba(125, 211, 252, 0.22) 46%, rgba(52, 211, 153, 0.18) 58%, transparent 76%);
   transform: translateX(-130%);
   transition: transform 0.9s ease;
   pointer-events: none;
@@ -188,13 +190,13 @@
 }
 
 .cyber-card-active::before {
-  opacity: 0.56;
+  opacity: 0.72;
 }
 
 .cyber-card-active::after {
   background:
-    linear-gradient(110deg, transparent 20%, rgba(125, 211, 252, 0.26) 44%, rgba(244, 114, 182, 0.24) 58%, transparent 78%),
-    linear-gradient(165deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.02) 46%, transparent 72%);
+    linear-gradient(110deg, transparent 20%, rgba(125, 211, 252, 0.28) 44%, rgba(52, 211, 153, 0.22) 58%, transparent 78%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.02) 46%, transparent 72%);
 }
 
 .cyber-card-offline::before,
@@ -203,30 +205,29 @@
 }
 
 .cyber-card-active { animation: none; }
-.cyber-orb {
-  position: absolute;
-  width: 8.25rem;
-  height: 8.25rem;
-  top: -2.6rem;
-  right: -1.2rem;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.42) 0%, rgba(56, 189, 248, 0.14) 35%, transparent 72%);
-  filter: blur(1px);
-  opacity: 0.75;
-  animation: orb-float 7s ease-in-out infinite;
-  pointer-events: none;
-}
 
 .cyber-grid {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(to right, rgba(125, 211, 252, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(125, 211, 252, 0.07) 1px, transparent 1px);
-  background-size: 20px 20px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.38), transparent 72%);
-  opacity: 0.7;
-  animation: grid-drift 12s linear infinite;
+    linear-gradient(to right, rgba(125, 211, 252, 0.075) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(125, 211, 252, 0.055) 1px, transparent 1px),
+    linear-gradient(135deg, transparent 0 47%, rgba(52, 211, 153, 0.13) 48% 49%, transparent 50% 100%);
+  background-size: 18px 18px, 18px 18px, 96px 96px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.54), transparent 78%);
+  opacity: 0.82;
+  animation: grid-drift 14s linear infinite;
+  pointer-events: none;
+}
+
+.cyber-scan {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 5px),
+    linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.12), transparent);
+  opacity: 0.18;
+  mix-blend-mode: screen;
   pointer-events: none;
 }
 
@@ -265,12 +266,6 @@
       0 0 0 1px rgba(56, 189, 248, 0.45),
       0 0 42px -14px rgba(14, 165, 233, 0.75);
   }
-}
-
-@keyframes orb-float {
-  0%,
-  100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(-10px, 8px, 0) scale(1.08); }
 }
 
 @keyframes grid-drift {
