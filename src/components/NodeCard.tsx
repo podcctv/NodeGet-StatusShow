@@ -68,7 +68,7 @@ function OnlineStrip({ rows }: { rows: TaskQueryResult[] }) {
 
   return (
     <div className="rounded-md border border-border/50 bg-black/5 dark:bg-black/15 px-2.5 py-2">
-      <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1.5">
+      <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-muted-foreground mb-1.5">
         <span>24h 在线</span>
         <span className={ratio != null && ratio < 80 ? 'text-red-400' : ratio != null && ratio < 95 ? 'text-yellow-400' : 'text-emerald-400'}>
           {ratio != null ? `${ratio}%` : '—'}
@@ -149,7 +149,7 @@ export function NodeCard({
 
           {/* System Info */}
           {(os || cpu) && (
-            <div className="mt-3.5 grid grid-cols-1 gap-1.5 rounded-md border border-border/40 bg-black/5 dark:bg-black/10 px-3 py-2 text-[11px] font-mono text-foreground/70">
+            <div className="mt-3.5 grid grid-cols-1 gap-1.5 rounded-md border border-border/40 bg-slate-50 dark:bg-black/10 px-3 py-2 text-[11px] font-mono text-slate-600 dark:text-foreground/70">
               {os && <Info icon={Server}>{os}</Info>}
               {cpu && <Info icon={Cpu}>{cpu}</Info>}
             </div>
@@ -241,9 +241,9 @@ function Metric({
   const clampedForBar = numericValue != null ? Math.min(100, numericValue) : undefined
   const percent = pct(numericValue)
   return (
-    <div className="rounded-md border border-border/30 bg-black/5 dark:bg-black/15 p-2">
+    <div className="rounded-md border border-border/30 bg-slate-50 dark:bg-black/15 p-2">
       <div className="mb-1.5 flex items-center justify-between gap-1">
-        <span className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+        <span className="flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-muted-foreground">
           <Icon className="h-3 w-3" />
           {label}
         </span>
@@ -258,7 +258,7 @@ function Metric({
               key={i}
               className={cn(
                 "flex-1 rounded-sm",
-                isFilled ? loadColor(numericValue) : "bg-black/10 dark:bg-white/10"
+                isFilled ? loadColor(numericValue) : "bg-slate-200 dark:bg-white/10"
               )}
             />
           )
@@ -270,8 +270,8 @@ function Metric({
 
 function StatBox({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
   return (
-    <div className="rounded-md border border-border/30 bg-black/5 dark:bg-black/10 px-2.5 py-2">
-      <div className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+    <div className="rounded-md border border-border/30 bg-slate-50 dark:bg-black/10 px-2.5 py-2">
+      <div className="mb-1 flex items-center gap-1 text-[10px] text-slate-500 dark:text-muted-foreground">
         <Icon className="h-3 w-3" />
         {label}
       </div>
