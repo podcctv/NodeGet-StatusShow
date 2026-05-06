@@ -80,6 +80,7 @@ export interface HistorySample {
 }
 
 export interface Node {
+  id: string
   uuid: string
   source: string
   online: boolean

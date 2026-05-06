@@ -17,7 +17,7 @@ export function NodeCard({ node }: { node: Node }) {
   const virt = virtLabel(node)
   const cpu = cpuLabel(node)
   const Wrapper = node.online ? 'a' : 'div'
-  const wrapperProps = node.online ? { href: `#${encodeURIComponent(node.uuid)}` } : {}
+  const wrapperProps = node.online ? { href: `#${encodeURIComponent(node.id)}` } : {}
 
   return (
     <Wrapper {...wrapperProps} className={cn('block', !node.online && 'cursor-default')}>
