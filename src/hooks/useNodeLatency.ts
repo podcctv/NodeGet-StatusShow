@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { taskQuery } from '../api/methods'
+import { useEffect, useRef, useState } from 'react'
+import { taskCreateBlocking, taskQuery } from '../api/methods'
 import { latencyTaskType, latencyValue } from '../utils/latency'
 import type { BackendPool } from '../api/pool'
 import type { LatencyType, TaskQueryResult } from '../types'
@@ -9,6 +9,8 @@ const DAY_MS = 24 * HOUR_MS
 const REFRESH_MS = 10_000
 const QUERY_TIMEOUT_MS = 20_000
 const FALLBACK_LIMIT = 500
+const LIVE_PROBE_INTERVAL_MS = 60_000
+const LIVE_PROBE_TIMEOUT_MS = 8_000
 
 function clean(rows: TaskQueryResult[] | undefined): TaskQueryResult[] {
   return (rows ?? [])
@@ -35,6 +37,36 @@ function mergeRows(...groups: TaskQueryResult[][]) {
   return clean([...map.values()])
 }
 
+function probeTarget(backendUrl: string) {
+  try {
+    const u = new URL(backendUrl)
+    const host = u.hostname
+    if (!host) return null
+    const port = u.port || (u.protocol === 'wss:' || u.protocol === 'https:' ? '443' : '80')
+    return { ping: host, tcp: `${host}:${port}` }
+  } catch {
+    return null
+  }
+}
+
+function probeRow(
+  uuid: string,
+  type: LatencyType,
+  target: string,
+  result: Awaited<ReturnType<typeof taskCreateBlocking>>,
+): TaskQueryResult {
+  return {
+    task_id: result.task_id,
+    uuid,
+    timestamp: result.timestamp,
+    success: result.success,
+    error_message: result.error_message,
+    cron_source: '实时探测',
+    task_event_type: { [type]: target },
+    task_event_result: result.task_event_result,
+  }
+}
+
 export function useNodeLatency(
   pool: BackendPool | null,
   source: string | null,
@@ -43,12 +75,16 @@ export function useNodeLatency(
   const [pingData, setPingData] = useState<TaskQueryResult[]>([])
   const [tcpData, setTcpData] = useState<TaskQueryResult[]>([])
   const [statusData, setStatusData] = useState<TaskQueryResult[]>([])
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const lastProbeAt = useRef(0)
 
   useEffect(() => {
     setPingData([])
     setTcpData([])
     setStatusData([])
+    setError(null)
+    lastProbeAt.current = 0
 
     if (!pool || !source || !uuid) return
     const entry = pool.entries.find(e => e.name === source)
@@ -62,7 +98,7 @@ export function useNodeLatency(
       const dayWindow: [number, number] = [now - DAY_MS, now]
       setLoading(true)
 
-      const [pingHour, tcpHour, pingDay, tcpDay, fallback] = await Promise.allSettled([
+      const [pingHour, tcpHour, pingDay, tcpDay, pingRecent, tcpRecent] = await Promise.allSettled([
         taskQuery(
           entry.client,
           [{ uuid }, { timestamp_from_to: hourWindow }, { type: 'ping' }],
@@ -85,30 +121,71 @@ export function useNodeLatency(
         ),
         taskQuery(
           entry.client,
-          [{ uuid }, { limit: FALLBACK_LIMIT }],
+          [{ uuid }, { type: 'ping' }, { limit: FALLBACK_LIMIT }],
+          QUERY_TIMEOUT_MS,
+        ),
+        taskQuery(
+          entry.client,
+          [{ uuid }, { type: 'tcp_ping' }, { limit: FALLBACK_LIMIT }],
           QUERY_TIMEOUT_MS,
         ),
       ])
 
       if (cancelled) return
-      const fallbackRows =
-        fallback.status === 'fulfilled'
-          ? clean(fallback.value).filter(r => inWindow(r, dayWindow[0], dayWindow[1]))
-          : []
+      const queryErrors = [pingHour, tcpHour, pingDay, tcpDay, pingRecent, tcpRecent]
+        .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+        .map(r => r.reason instanceof Error ? r.reason.message : String(r.reason))
+      setError(queryErrors[0] ?? null)
+
+      const fallbackRows = mergeRows(
+        pingRecent.status === 'fulfilled' ? pingRecent.value : [],
+        tcpRecent.status === 'fulfilled' ? tcpRecent.value : [],
+      ).filter(r => inWindow(r, dayWindow[0], dayWindow[1]))
 
       const fallbackPing = fallbackRows.filter(r => matchesLatencyType(r, 'ping'))
       const fallbackTcp = fallbackRows.filter(r => matchesLatencyType(r, 'tcp_ping'))
 
-      const nextPingHour = mergeRows(
+      let nextPingHour = mergeRows(
         pingHour.status === 'fulfilled' ? pingHour.value : [],
         fallbackPing.filter(r => inWindow(r, hourWindow[0], hourWindow[1])),
       )
-      const nextTcpHour = mergeRows(
+      let nextTcpHour = mergeRows(
         tcpHour.status === 'fulfilled' ? tcpHour.value : [],
         fallbackTcp.filter(r => inWindow(r, hourWindow[0], hourWindow[1])),
       )
-      const nextPingDay = mergeRows(pingDay.status === 'fulfilled' ? pingDay.value : [], fallbackPing)
-      const nextTcpDay = mergeRows(tcpDay.status === 'fulfilled' ? tcpDay.value : [], fallbackTcp)
+      let nextPingDay = mergeRows(pingDay.status === 'fulfilled' ? pingDay.value : [], fallbackPing)
+      let nextTcpDay = mergeRows(tcpDay.status === 'fulfilled' ? tcpDay.value : [], fallbackTcp)
+
+      const shouldProbe = (!nextPingHour.length || !nextTcpHour.length) && now - lastProbeAt.current > LIVE_PROBE_INTERVAL_MS
+      const target = shouldProbe ? probeTarget(entry.backend_url) : null
+      if (target) {
+        lastProbeAt.current = now
+        const [pingProbe, tcpProbe] = await Promise.allSettled([
+          !nextPingHour.length
+            ? taskCreateBlocking(entry.client, uuid, { ping: target.ping }, LIVE_PROBE_TIMEOUT_MS)
+            : Promise.resolve(null),
+          !nextTcpHour.length
+            ? taskCreateBlocking(entry.client, uuid, { tcp_ping: target.tcp }, LIVE_PROBE_TIMEOUT_MS)
+            : Promise.resolve(null),
+        ])
+
+        if (cancelled) return
+        const probeErrors = [pingProbe, tcpProbe]
+          .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+          .map(r => r.reason instanceof Error ? r.reason.message : String(r.reason))
+        if (probeErrors.length) setError(probeErrors[0])
+
+        if (pingProbe.status === 'fulfilled' && pingProbe.value) {
+          const row = probeRow(uuid, 'ping', target.ping, pingProbe.value)
+          nextPingHour = mergeRows(nextPingHour, [row])
+          nextPingDay = mergeRows(nextPingDay, [row])
+        }
+        if (tcpProbe.status === 'fulfilled' && tcpProbe.value) {
+          const row = probeRow(uuid, 'tcp_ping', target.tcp, tcpProbe.value)
+          nextTcpHour = mergeRows(nextTcpHour, [row])
+          nextTcpDay = mergeRows(nextTcpDay, [row])
+        }
+      }
 
       setPingData(nextPingHour)
       setTcpData(nextTcpHour)
@@ -124,5 +201,5 @@ export function useNodeLatency(
     }
   }, [pool, source, uuid])
 
-  return { pingData, tcpData, statusData, loading }
+  return { pingData, tcpData, statusData, loading, error }
 }

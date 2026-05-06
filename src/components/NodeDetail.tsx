@@ -73,7 +73,7 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
     return () => el.removeEventListener('scroll', onScroll)
   }, [node])
 
-  const { pingData, tcpData, statusData, loading: latencyLoading } = useNodeLatency(
+  const { pingData, tcpData, statusData, loading: latencyLoading, error: latencyError } = useNodeLatency(
     pool,
     node?.source ?? null,
     node?.uuid ?? null,
@@ -216,8 +216,9 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
           rows={tcpData}
           type="tcp_ping"
           loading={latencyLoading}
+          error={latencyError}
         />
-        <LatencyBlock title="Ping" rows={pingData} type="ping" loading={latencyLoading} />
+        <LatencyBlock title="Ping" rows={pingData} type="ping" loading={latencyLoading} error={latencyError} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-8">
           <Section title="系统">
@@ -475,11 +476,12 @@ interface LatencyBlockProps {
   rows: TaskQueryResult[]
   type: LatencyType
   loading: boolean
+  error?: string | null
 }
 
 const ms = (v: number) => `${v.toFixed(1)} ms`
 
-function LatencyBlock({ title, rows, type, loading }: LatencyBlockProps) {
+function LatencyBlock({ title, rows, type, loading, error }: LatencyBlockProps) {
   const { data, series } = useMemo(() => buildLatencyChart(rows, type), [rows, type])
   const stats = useMemo(() => computeLatencyStats(rows, type), [rows, type])
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
@@ -500,7 +502,7 @@ function LatencyBlock({ title, rows, type, loading }: LatencyBlockProps) {
       <div className="relative h-52 sm:h-60">
         {empty && (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-            {loading ? '加载中…' : `暂无 ${type} 数据`}
+            {loading ? '加载中…' : error ? `暂无 ${type} 数据 · ${error}` : `暂无 ${type} 数据`}
           </div>
         )}
         {!empty && (
@@ -534,7 +536,7 @@ function LatencyBlock({ title, rows, type, loading }: LatencyBlockProps) {
                   dataKey={s.name}
                   stroke={s.color}
                   strokeWidth={1.5}
-                  dot={false}
+                  dot={data.length <= 2}
                   connectNulls
                   isAnimationActive={false}
                 />
