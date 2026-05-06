@@ -13,7 +13,6 @@ import { Badge } from './ui/badge'
 import { Card } from './ui/card'
 import { Progress } from './ui/progress'
 import { Flag } from './Flag'
-import { StatusDot } from './StatusDot'
 import { bytes, pct, relativeAge, uptime } from '../utils/format'
 import { cpuLabel, deriveUsage, displayName, distroLogo, osLabel, virtLabel } from '../utils/derive'
 import { cn, loadColor, loadTextColor } from '../utils/cn'
@@ -51,9 +50,6 @@ export function NodeCard({ node }: { node: Node }) {
               ) : (
                 <Server className="h-5 w-5 text-cyan-200" />
               )}
-              <span className="absolute -right-1 -top-1">
-                <StatusDot online={node.online} />
-              </span>
             </div>
 
             <div className="min-w-0 flex-1">
@@ -64,9 +60,7 @@ export function NodeCard({ node }: { node: Node }) {
                 <Flag code={node.meta?.region} className="shrink-0" />
               </div>
               <div className="mt-1 flex items-center gap-2 text-[11px] font-mono uppercase tracking-wide text-cyan-100/65">
-                <span className={cn('h-1.5 w-1.5 rounded-full', node.online ? 'bg-emerald-300 shadow-[0_0_10px_rgba(52,211,153,0.85)]' : 'bg-rose-400')} />
-                <span>{node.online ? 'Online' : 'Offline'}</span>
-                {virt && <span className="truncate">/ {virt}</span>}
+                {virt && <span className="truncate">{virt}</span>}
               </div>
             </div>
           </div>
