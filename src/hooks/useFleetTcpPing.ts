@@ -3,6 +3,7 @@ import { taskQuery } from '../api/methods'
 import { computeLatencyStats, latencySeriesName, latencyValue } from '../utils/latency'
 import type { BackendPool } from '../api/pool'
 import type { Node, TaskQueryResult } from '../types'
+import type { HourlyBucket } from '../components/FleetTcpPingPanel'
 
 const REFRESH_MS = 60_000
 const QUERY_TIMEOUT_MS = 15_000
@@ -27,6 +28,38 @@ function mergeRows(groups: TaskQueryResult[][]) {
   const map = new Map<string, TaskQueryResult>()
   for (const row of groups.flat()) map.set(`${row.task_id}:${row.timestamp}:${row.uuid}`, row)
   return clean([...map.values()])
+}
+
+function normalizeTs(ts: number) {
+  return ts < 1_000_000_000_000 ? ts * 1000 : ts
+}
+
+/** Compute hourly buckets (24 hours) from task query results */
+function computeHourlyBuckets(rows: TaskQueryResult[], type: 'tcp_ping'): HourlyBucket[] {
+  const buckets: { sum: number; count: number }[] = Array.from({ length: 24 }, () => ({ sum: 0, count: 0 }))
+
+  for (const row of rows) {
+    const val = latencyValue(row, type)
+    if (val == null) continue
+    const ms = normalizeTs(row.timestamp)
+    const hour = new Date(ms).getHours()
+    buckets[hour].sum += val
+    buckets[hour].count += 1
+  }
+
+  return buckets.map((b, i) => ({
+    hour: i,
+    avg: b.count > 0 ? b.sum / b.count : null,
+    count: b.count,
+  }))
+}
+
+export interface CarrierRow {
+  name: string
+  avg: number | null
+  loss: number | null
+  count: number
+  hourly?: HourlyBucket[]
 }
 
 export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
@@ -87,7 +120,7 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       nodeMap.set(row.uuid, list)
     }
 
-    const out = new Map<string, Array<{ name: string; avg: number | null; loss: number | null; count: number }>>()
+    const out = new Map<string, CarrierRow[]>()
     for (const [uuid, list] of nodeMap) {
       const groups = new Map<string, TaskQueryResult[]>()
       for (const row of list) {
@@ -102,7 +135,8 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
         const vals = stats.flatMap(s => s.avg == null ? [] : [s.avg])
         const avg = vals.length ? vals.reduce((sum, v) => sum + v, 0) / vals.length : null
         const loss = stats.length ? stats.reduce((sum, s) => sum + s.lossRate, 0) / stats.length : null
-        return { name, avg, loss, count: group.length }
+        const hourly = computeHourlyBuckets(group, 'tcp_ping')
+        return { name, avg, loss, count: group.length, hourly }
       }))
     }
     return out
@@ -125,7 +159,8 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       const vals = stats.flatMap(s => s.avg == null ? [] : [s.avg])
       const avg = vals.length ? vals.reduce((sum, v) => sum + v, 0) / vals.length : null
       const loss = stats.length ? stats.reduce((sum, s) => sum + s.lossRate, 0) / stats.length : null
-      return { name, avg, loss, count: list.length }
+      const hourly = computeHourlyBuckets(list, 'tcp_ping')
+      return { name, avg, loss, count: list.length, hourly }
     })
   }, [rows])
 

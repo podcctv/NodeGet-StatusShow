@@ -14,13 +14,14 @@ import { Card } from './ui/card'
 import { Progress } from './ui/progress'
 import { Flag } from './Flag'
 import { FleetTcpPingPanel } from './FleetTcpPingPanel'
+import type { HourlyBucket } from './FleetTcpPingPanel'
 import { bytes, pct, relativeAge, uptime } from '../utils/format'
 import { cpuLabel, deriveUsage, displayName, distroLogo, osLabel, virtLabel } from '../utils/derive'
 import { cn, loadColor, loadTextColor } from '../utils/cn'
 import type { Node } from '../types'
 import type { ReactNode } from 'react'
 
-const EMPTY_TCP_PING = [
+const EMPTY_TCP_PING: Array<{ name: string; avg: number | null; loss: number | null; count: number; hourly?: HourlyBucket[] }> = [
   { name: '移动', avg: null, loss: null, count: 0 },
   { name: '电信', avg: null, loss: null, count: 0 },
   { name: '联通', avg: null, loss: null, count: 0 },
@@ -33,7 +34,7 @@ export function NodeCard({
   tcpPingReadable,
 }: {
   node: Node
-  tcpPing?: Array<{ name: string; avg: number | null; loss: number | null; count: number }>
+  tcpPing?: Array<{ name: string; avg: number | null; loss: number | null; count: number; hourly?: HourlyBucket[] }>
   tcpPingLoading?: boolean
   tcpPingReadable?: boolean
 }) {
@@ -50,10 +51,10 @@ export function NodeCard({
   const wrapperProps = node.online ? { href: `#${encodeURIComponent(node.id)}` } : {}
 
   return (
-    <Wrapper {...wrapperProps} className={cn('block', !node.online && 'cursor-default')}>
+    <Wrapper {...wrapperProps} className={cn('block h-full', !node.online && 'cursor-default')}>
       <Card
         className={cn(
-          'p-0 transition duration-300 cyber-card',
+          'p-0 h-full flex flex-col transition duration-300 cyber-card',
           node.online && 'hover:-translate-y-1 hover:scale-[1.01] cyber-card-active',
           !node.online && 'opacity-60 pointer-events-none select-none cyber-card-offline',
         )}
@@ -61,7 +62,8 @@ export function NodeCard({
         <div className="cyber-grid" aria-hidden />
         <div className="cyber-scan" aria-hidden />
 
-        <div className="relative z-10 p-4 pb-3 space-y-3.5">
+        <div className="relative z-10 p-4 pb-3 flex flex-col flex-1">
+          {/* Header */}
           <div className="flex items-start gap-3">
             <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-cyan-300/30 bg-black/25 shadow-[inset_0_0_18px_rgba(34,211,238,0.16)]">
               {logo ? (
@@ -84,27 +86,34 @@ export function NodeCard({
             </div>
           </div>
 
+          {/* System Info */}
           {(os || cpu) && (
-            <div className="grid grid-cols-1 gap-1.5 rounded-md border border-white/10 bg-white/[0.045] px-3 py-2 text-[11px] font-mono text-slate-300/85">
+            <div className="mt-3.5 grid grid-cols-1 gap-1.5 rounded-md border border-white/10 bg-white/[0.045] px-3 py-2 text-[11px] font-mono text-slate-300/85">
               {os && <Info icon={Server}>{os}</Info>}
               {cpu && <Info icon={Cpu}>{cpu}</Info>}
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-2">
+          {/* Metrics */}
+          <div className="mt-3.5 grid grid-cols-3 gap-2">
             <Metric icon={Gauge} label="CPU" value={u.cpu} />
             <Metric icon={MemoryStick} label="MEM" value={u.mem} />
             <Metric icon={HardDrive} label="DISK" value={u.disk} />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+          {/* Network */}
+          <div className="mt-3.5 grid grid-cols-2 gap-2 font-mono text-xs">
             <StatBox icon={ArrowDown} label="DOWN">{bytes(u.netIn || 0)}/s</StatBox>
             <StatBox icon={ArrowUp} label="UP">{bytes(u.netOut || 0)}/s</StatBox>
           </div>
 
-          <FleetTcpPingPanel rows={tcpPingRows} loading={tcpPingLoading} readable={tcpPingReadable} />
+          {/* TCPing - this grows to fill space */}
+          <div className="mt-3.5 flex-1 flex flex-col justify-end">
+            <FleetTcpPingPanel rows={tcpPingRows} loading={tcpPingLoading} readable={tcpPingReadable} />
+          </div>
 
-          <div className="flex items-center gap-3 border-t border-cyan-300/20 pt-3 font-mono text-[11px] text-slate-300/80">
+          {/* Footer */}
+          <div className="mt-3.5 flex items-center gap-3 border-t border-cyan-300/20 pt-3 font-mono text-[11px] text-slate-300/80">
             <Stat icon={Clock}>{uptime(u.uptime)}</Stat>
             <span
               className={cn(
@@ -117,8 +126,9 @@ export function NodeCard({
             </span>
           </div>
 
+          {/* Tags */}
           {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {tags.slice(0, 4).map(t => (
                 <Badge key={t} variant="outline" className="border-cyan-300/25 bg-cyan-300/5 text-[10px] text-cyan-100">
                   {t}
