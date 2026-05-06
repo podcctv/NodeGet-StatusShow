@@ -19,6 +19,13 @@ import { cpuLabel, deriveUsage, displayName, distroLogo, osLabel, virtLabel } fr
 import { cn, loadColor, loadTextColor } from '../utils/cn'
 import type { Node } from '../types'
 import type { ReactNode } from 'react'
+
+const EMPTY_TCP_PING = [
+  { name: '移动', avg: null, loss: null, count: 0 },
+  { name: '电信', avg: null, loss: null, count: 0 },
+  { name: '联通', avg: null, loss: null, count: 0 },
+]
+
 export function NodeCard({
   node,
   tcpPing,
@@ -38,6 +45,7 @@ export function NodeCard({
   const cpu = cpuLabel(node)
   const updated = relativeAge(u.ts)
   const updateState = node.online ? 'ONLINE' : 'OFFLINE'
+  const tcpPingRows = tcpPing ?? EMPTY_TCP_PING
   const Wrapper = node.online ? 'a' : 'div'
   const wrapperProps = node.online ? { href: `#${encodeURIComponent(node.id)}` } : {}
 
@@ -94,9 +102,7 @@ export function NodeCard({
             <StatBox icon={ArrowUp} label="UP">{bytes(u.netOut || 0)}/s</StatBox>
           </div>
 
-          {tcpPing && (
-            <FleetTcpPingPanel rows={tcpPing} loading={tcpPingLoading} readable={tcpPingReadable} />
-          )}
+          <FleetTcpPingPanel rows={tcpPingRows} loading={tcpPingLoading} readable={tcpPingReadable} />
 
           <div className="flex items-center gap-3 border-t border-cyan-300/20 pt-3 font-mono text-[11px] text-slate-300/80">
             <Stat icon={Clock}>{uptime(u.uptime)}</Stat>

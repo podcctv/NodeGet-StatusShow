@@ -3,9 +3,9 @@ import { Progress } from './ui/progress'
 import { cn } from '../utils/cn'
 
 const carrierStyles: Record<string, { color: string; bar: string }> = {
-  移动: { color: 'text-emerald-300', bar: 'bg-emerald-400' },
-  电信: { color: 'text-cyan-300', bar: 'bg-cyan-400' },
-  联通: { color: 'text-fuchsia-300', bar: 'bg-fuchsia-400' },
+  移动: { color: 'text-lime-300', bar: 'bg-lime-400' },
+  电信: { color: 'text-amber-300', bar: 'bg-amber-400' },
+  联通: { color: 'text-orange-300', bar: 'bg-orange-400' },
 }
 
 function score(avg: number | null) {
@@ -22,8 +22,8 @@ interface Props {
 export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
   const hasRows = rows.some(r => r.count > 0)
   return (
-    <div className="rounded-md border border-cyan-300/15 bg-black/20 px-3 py-2 shadow-[inset_0_0_18px_rgba(34,211,238,0.06)]">
-      <div className="mb-2 flex items-center justify-between text-[10px] font-mono uppercase tracking-wide text-cyan-100/60">
+    <div className="retro-terminal rounded-md border border-amber-300/20 bg-black/25 px-3 py-2 shadow-[inset_0_0_18px_rgba(251,191,36,0.06)]">
+      <div className="mb-2 flex items-center justify-between text-[10px] font-mono uppercase tracking-wide text-amber-100/65">
         <span>TCP 三网 Ping</span>
         <span className="min-w-[42px] text-right">{readable ? (hasRows ? 'LIVE' : loading ? 'SYNC' : 'NO DATA') : 'NO ACCESS'}</span>
       </div>
@@ -37,8 +37,8 @@ export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
                 <Activity className="h-3 w-3" />
                 {item.name}
               </span>
-              <Progress value={pct} className="h-1.5 rounded-sm bg-slate-950/80" indicatorClassName={cn(style.bar, 'progress-glow transition-[width] duration-500 ease-out')} />
-              <span className="text-right font-mono text-[10px] text-cyan-50">
+              <Progress value={pct} className="h-1.5 rounded-sm bg-stone-950/90" indicatorClassName={cn(style.bar, 'progress-glow transition-[width] duration-500 ease-out')} />
+              <span className="text-right font-mono text-[10px] text-amber-50">
                 {item.avg == null ? '—' : `${Math.round(item.avg)}ms`}
               </span>
             </div>

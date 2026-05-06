@@ -7,7 +7,7 @@ import type { Node, TaskQueryResult } from '../types'
 const REFRESH_MS = 60_000
 const QUERY_TIMEOUT_MS = 15_000
 const PER_NODE_LIMIT = 24
-const MAX_NODES = 32
+const MAX_NODES = 160
 
 function clean(rows: TaskQueryResult[] | undefined): TaskQueryResult[] {
   return (rows ?? [])
@@ -35,7 +35,7 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
   const [readable, setReadable] = useState(true)
 
   const ids = useMemo(
-    () => nodes.filter(n => n.online).slice(0, MAX_NODES).map(n => ({ source: n.source, uuid: n.uuid })),
+    () => nodes.slice(0, MAX_NODES).map(n => ({ source: n.source, uuid: n.uuid })),
     [nodes],
   )
   const idsKey = useMemo(() => ids.map(id => `${id.source}:${id.uuid}`).join('|'), [ids])
