@@ -139,7 +139,7 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-5 sm:space-y-8">
         <Section title="资源">
           <div className="flex flex-wrap justify-around gap-4 sm:gap-6">
             <Ring label="CPU" value={u.cpu} sub={loadAvg ?? undefined} />
@@ -201,9 +201,11 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
         )}
 
         <Section title="状态面板">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-4">
             <OnlinePanel online={node.online} />
-            <TcpMiniPanel rows={tcpData} />
+            <div className="xl:col-span-2">
+              <TcpMiniPanel rows={tcpData} />
+            </div>
           </div>
         </Section>
 
@@ -215,7 +217,7 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
         />
         <LatencyBlock title="Ping" rows={pingData} type="ping" loading={latencyLoading} />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-8">
           <Section title="系统">
             <KV k="主机名" v={s?.system_host_name} />
             <KV k="操作系统" v={osLabel(node)} />
@@ -267,11 +269,11 @@ function OnlinePanel({ online }: { online: boolean }) {
         <span className="text-emerald-300">在线状态</span>
         <span className="font-mono text-emerald-300">{online ? '100%' : '0%'}</span>
       </div>
-      <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(24, minmax(0,1fr))' }}>
+      <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(18, minmax(0,1fr))' }}>
         {Array.from({ length: 24 }).map((_, idx) => (
           <span
             key={idx}
-            className={cn('h-8 rounded-sm', online ? 'bg-emerald-400/85' : 'bg-muted/40')}
+            className={cn('h-6 sm:h-8 rounded-sm', online ? 'bg-emerald-400/85' : 'bg-muted/40')}
           />
         ))}
       </div>
@@ -282,21 +284,21 @@ function OnlinePanel({ online }: { online: boolean }) {
 function TcpMiniPanel({ rows }: { rows: TaskQueryResult[] }) {
   const stats = useMemo(() => computeLatencyStats(rows, 'tcp_ping').slice(0, 5), [rows])
   return (
-    <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/5 p-4 space-y-2">
+    <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/5 p-4 space-y-2.5">
       <div className="text-sm text-cyan-300">TCP Ping 质量</div>
       {stats.map(s => (
         <div key={s.name} className="space-y-1">
-          <div className="flex items-center gap-3">
-            <span className="w-12 text-xs text-muted-foreground truncate">{s.name}</span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="w-16 sm:w-20 text-xs text-muted-foreground truncate">{s.name}</span>
             <div className="h-3 flex-1 rounded bg-black/20 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-cyan-400 to-sky-400"
                 style={{ width: `${Math.max(2, Math.min(100, 100 - (s.avg ?? 999) / 4))}%` }}
               />
             </div>
-            <span className="w-14 text-right font-mono text-xs">{s.avg != null ? `${Math.round(s.avg)}ms` : '—'}</span>
+            <span className="w-14 sm:w-16 text-right font-mono text-xs">{s.avg != null ? `${Math.round(s.avg)}ms` : '—'}</span>
           </div>
-          <div className="ml-[3.75rem] text-[11px] text-muted-foreground font-mono">
+          <div className="ml-[4.25rem] sm:ml-[5.75rem] text-[11px] text-muted-foreground font-mono">
             min {s.min != null ? `${Math.round(s.min)}ms` : '—'} · max {s.max != null ? `${Math.round(s.max)}ms` : '—'} · 丢包 {s.loss.toFixed(1)}%
           </div>
         </div>
@@ -441,7 +443,7 @@ function LatencyBlock({ title, rows, type, loading }: LatencyBlockProps) {
 
   return (
     <Section title={`${title} · 近 1 小时`}>
-      <div className="relative h-60">
+      <div className="relative h-52 sm:h-60">
         {empty && (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
             {loading ? '加载中…' : `暂无 ${type} 数据`}
@@ -492,14 +494,14 @@ function LatencyBlock({ title, rows, type, loading }: LatencyBlockProps) {
       </div>
 
       {stats.length > 0 && (
-        <div className="mt-3 border-t pt-3">
-          <div className="flex items-center px-2 pb-1 text-[11px] text-muted-foreground">
+        <div className="mt-3 border-t pt-3 overflow-x-auto">
+          <div className="flex items-center min-w-[340px] px-2 pb-1 text-[11px] text-muted-foreground">
             <span className="flex-1">来源</span>
             <span className="w-20 text-right">平均延迟</span>
             <span className="w-16 text-right">抖动</span>
             <span className="w-14 text-right">丢包率</span>
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 min-w-[340px]">
             {stats.map(s => (
               <LatencyStatsRow
                 key={s.name}

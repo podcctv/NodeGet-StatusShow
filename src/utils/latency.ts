@@ -22,8 +22,32 @@ function normalizeTs(ts: number) {
 }
 
 function pickValue(row: TaskQueryResult, type: LatencyType): number | null {
-  const v = row.task_event_result?.[type]
-  return row.success && typeof v === 'number' ? v : null
+  if (!row.success) return null
+  const payload = row.task_event_result
+  if (!payload) return null
+
+  const keys =
+    type === 'tcp_ping'
+      ? ['tcp_ping', 'tcpPing', 'tcp', 'latency', 'value', 'delay']
+      : ['ping', 'icmp_ping', 'icmpPing', 'latency', 'value', 'delay']
+
+  for (const key of keys) {
+    const v = payload[key]
+    if (typeof v === 'number') return v
+  }
+
+  for (const v of Object.values(payload)) {
+    if (typeof v === 'number') return v
+    if (v && typeof v === 'object') {
+      const nested = v as Record<string, unknown>
+      for (const key of keys) {
+        const nv = nested[key]
+        if (typeof nv === 'number') return nv
+      }
+    }
+  }
+
+  return null
 }
 
 function seriesNames(rows: TaskQueryResult[]) {
