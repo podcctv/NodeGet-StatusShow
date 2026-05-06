@@ -1,29 +1,42 @@
 import { Activity } from 'lucide-react'
 import { cn } from '../utils/cn'
 
-const carrierStyles: Record<string, { color: string; fill: string }> = {
-  电信: { color: 'text-sky-200', fill: 'bg-orange-400' },
-  联通: { color: 'text-violet-200', fill: 'bg-rose-400' },
-  移动: { color: 'text-lime-200', fill: 'bg-amber-400' },
+/** Traditional latency color thresholds */
+function barColor(avgMs: number | null): string {
+  if (avgMs == null) return 'bg-slate-800/60'
+  if (avgMs <= 80) return 'bg-emerald-400'
+  if (avgMs <= 150) return 'bg-yellow-400'
+  return 'bg-red-400'
 }
 
-function score(avg: number | null, loss: number | null) {
-  if (avg == null) return 0
-  const latencyScore = 100 - avg / 5
-  const lossPenalty = (loss ?? 0) * 2
-  return Math.max(2, Math.min(100, latencyScore - lossPenalty))
+function barGlow(avgMs: number | null): string {
+  if (avgMs == null) return ''
+  if (avgMs <= 80) return 'shadow-[0_0_6px_rgba(52,211,153,0.5)]'
+  if (avgMs <= 150) return 'shadow-[0_0_6px_rgba(250,204,21,0.45)]'
+  return 'shadow-[0_0_6px_rgba(248,113,113,0.5)]'
 }
 
-function segmentClass(index: number, activeSegments: number, loss: number | null, fill: string) {
-  if (index >= activeSegments) return 'bg-slate-950/90'
-  const lossRate = loss ?? 0
-  if (lossRate >= 8 && index % 3 === 1) return 'bg-rose-400'
-  if (lossRate >= 3 && index % 5 === 2) return 'bg-yellow-300'
-  return fill
+function labelColor(avgMs: number | null): string {
+  if (avgMs == null) return 'text-slate-500'
+  if (avgMs <= 80) return 'text-emerald-300'
+  if (avgMs <= 150) return 'text-yellow-300'
+  return 'text-red-300'
+}
+
+export interface HourlyBucket {
+  hour: number      // 0-23
+  avg: number | null // average latency in ms for that hour
+  count: number
 }
 
 interface Props {
-  rows: Array<{ name: string; avg: number | null; loss: number | null; count: number }>
+  rows: Array<{
+    name: string
+    avg: number | null
+    loss: number | null
+    count: number
+    hourly?: HourlyBucket[]
+  }>
   loading?: boolean
   readable?: boolean
 }
@@ -31,38 +44,60 @@ interface Props {
 export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
   const hasRows = rows.some(r => r.count > 0)
   return (
-    <div className="retro-terminal rounded-md border border-slate-500/40 border-dashed bg-slate-900/55 px-3 py-3 shadow-[inset_0_0_18px_rgba(15,23,42,0.45)]">
+    <div className="retro-terminal rounded-md border border-cyan-500/20 bg-slate-900/70 px-3 py-3 shadow-[inset_0_0_18px_rgba(15,23,42,0.45)]">
       <div className="mb-3 flex items-center justify-between text-[11px] font-mono font-semibold tracking-wide text-cyan-100/85">
         <span className="inline-flex items-center gap-1.5">
           <Activity className="h-3.5 w-3.5 text-lime-300" />
           三网 TCPing
         </span>
-        <span className="min-w-[42px] text-right text-[10px] text-slate-400">{readable ? (hasRows ? 'LIVE' : loading ? 'SYNC' : 'NO DATA') : 'NO ACCESS'}</span>
+        <span className="min-w-[42px] text-right text-[10px] text-slate-400">
+          {readable ? (hasRows ? 'LIVE' : loading ? 'SYNC' : 'NO DATA') : 'NO ACCESS'}
+        </span>
       </div>
       <div className="space-y-2.5">
         {rows.map(item => {
-          const style = carrierStyles[item.name]
-          const pct = score(item.avg, item.loss)
-          const activeSegments = Math.round((pct / 100) * 24)
+          const hourly = item.hourly ?? Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            avg: null as number | null,
+            count: 0,
+          }))
+
+          // Ensure exactly 24 slots
+          const buckets: (number | null)[] = new Array(24).fill(null)
+          for (const h of hourly) {
+            if (h.hour >= 0 && h.hour < 24) {
+              buckets[h.hour] = h.avg
+            }
+          }
+
           return (
             <div key={item.name} className="grid grid-cols-[34px_1fr_48px] items-center gap-2">
-              <span className={cn('text-[11px] font-medium', style.color)}>
+              <span className="text-[11px] font-medium text-cyan-200/80">
                 {item.name}
               </span>
-              <div className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[2px] rounded-sm bg-slate-950/75 p-1">
-                {Array.from({ length: 24 }).map((_, idx) => (
+              <div
+                className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[2px] rounded-sm bg-slate-950/80 p-[3px]"
+                title="24h 延迟热力图 · 每格=1小时"
+              >
+                {buckets.map((avg, idx) => (
                   <span
                     key={idx}
                     className={cn(
-                      'h-3 rounded-[1px] shadow-[0_0_5px_rgba(251,191,36,0.14)] transition-colors duration-500',
-                      segmentClass(idx, activeSegments, item.loss, style.fill),
+                      'h-3 rounded-[1px] transition-colors duration-500',
+                      barColor(avg),
+                      barGlow(avg),
                     )}
+                    title={avg != null ? `${idx}:00 — ${Math.round(avg)}ms` : `${idx}:00 — 无数据`}
                   />
                 ))}
               </div>
               <div className="text-right font-mono leading-tight">
-                <div className="text-[10px] font-semibold text-cyan-50">{item.avg == null ? '—' : `${Math.round(item.avg)}ms`}</div>
-                <div className="text-[9px] text-slate-400">{item.loss == null ? '—' : `${item.loss.toFixed(0)}%`}</div>
+                <div className={cn('text-[10px] font-semibold', labelColor(item.avg))}>
+                  {item.avg == null ? '—' : `${Math.round(item.avg)}ms`}
+                </div>
+                <div className="text-[9px] text-slate-500">
+                  {item.loss == null ? '—' : `${item.loss.toFixed(0)}%`}
+                </div>
               </div>
             </div>
           )
