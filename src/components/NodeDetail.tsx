@@ -209,14 +209,7 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
         )}
 
         <Section title="状态面板">
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-3 sm:gap-4">
-            <div className="xl:col-span-3">
-              <OnlinePanel rows={statusData} loading={latencyLoading} nodeOnline={node.online} />
-            </div>
-            <div className="xl:col-span-2">
-              <TcpMiniPanel rows={tcpData} taskReadable={taskReadable} />
-            </div>
-          </div>
+          <OnlinePanel rows={statusData} loading={latencyLoading} nodeOnline={node.online} />
         </Section>
 
         {taskReadable ? (
@@ -280,13 +273,15 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
 }
 
 type HourState = 'online' | 'partial_offline' | 'fully_offline' | 'unknown'
+const STATUS_SLOT_MS = 10 * 60 * 1000
+const STATUS_SLOT_COUNT = 24 * 6
 
 function buildHourState(rows: TaskQueryResult[]): HourState[] {
   const now = Date.now()
   const states: HourState[] = []
-  for (let i = 23; i >= 0; i--) {
-    const start = now - (i + 1) * 60 * 60 * 1000
-    const end = now - i * 60 * 60 * 1000
+  for (let i = STATUS_SLOT_COUNT - 1; i >= 0; i--) {
+    const start = now - (i + 1) * STATUS_SLOT_MS
+    const end = now - i * STATUS_SLOT_MS
     const bucket = rows.filter(r => {
       const ts = r.timestamp < 1_000_000_000_000 ? r.timestamp * 1000 : r.timestamp
       return ts >= start && ts < end
@@ -325,13 +320,13 @@ function OnlinePanel({
           {onlineRatio == null ? (loading ? '同步中' : nodeOnline ? '在线' : '未知') : `${onlineRatio}%`}
         </span>
       </div>
-      <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(24, minmax(0,1fr))' }}>
+      <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${STATUS_SLOT_COUNT}, minmax(0,1fr))` }}>
         {states.map((state, idx) => (
           <span
             key={idx}
-            title={`${idx}:00-${idx + 1}:00`}
+            title={`近 24 小时 · 第 ${idx + 1} 个 10 分钟`}
             className={cn(
-              'h-6 sm:h-8 rounded-sm border border-black/30',
+              'h-5 rounded-[2px] border border-black/20',
               state === 'online' && 'bg-emerald-400/85',
               state === 'partial_offline' && 'bg-yellow-400/85',
               state === 'fully_offline' && 'bg-red-500/90',
@@ -342,41 +337,10 @@ function OnlinePanel({
       </div>
       <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-mono">
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-400/85" />在线</span>
-        <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-yellow-400/85" />有离线</span>
-        <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-red-500/90" />整小时离线</span>
+        <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-yellow-400/85" />10分钟内有离线</span>
+        <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-red-500/90" />10分钟离线</span>
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-slate-600/60" />无记录</span>
       </div>
-    </div>
-  )
-}
-
-function TcpMiniPanel({ rows, taskReadable }: { rows: TaskQueryResult[]; taskReadable: boolean }) {
-  const stats = useMemo(() => computeLatencyStats(rows, 'tcp_ping').slice(0, 5), [rows])
-  return (
-    <div className="rounded-xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/10 via-sky-500/5 to-slate-950 p-4 space-y-2.5">
-      <div className="text-sm text-cyan-300">TCP Ping 质量 / HTOP 风格</div>
-      {stats.map(s => (
-        <div key={s.name} className="space-y-1">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="w-16 sm:w-20 text-xs text-muted-foreground truncate">{s.name}</span>
-            <div className="h-3 flex-1 rounded bg-black/20 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-cyan-400 to-sky-400"
-                style={{ width: `${Math.max(2, Math.min(100, 100 - (s.avg ?? 999) / 4))}%` }}
-              />
-            </div>
-            <span className="w-14 sm:w-16 text-right font-mono text-xs">{s.avg != null ? `${Math.round(s.avg)}ms` : '—'}</span>
-          </div>
-          <div className="ml-[4.25rem] sm:ml-[5.75rem] text-[11px] text-muted-foreground font-mono">
-            jitter {s.jitter != null ? `${Math.round(s.jitter)}ms` : '—'} · 丢包 {s.lossRate.toFixed(1)}%
-          </div>
-        </div>
-      ))}
-      {stats.length === 0 && (
-        <div className="text-xs text-muted-foreground">
-          {taskReadable ? '暂无 TCP ping 数据' : '当前 Token 未开放任务探测数据'}
-        </div>
-      )}
     </div>
   )
 }
