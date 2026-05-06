@@ -309,8 +309,9 @@ function OnlinePanel({
 }) {
   const states = useMemo(() => buildHourState(rows), [rows])
   const knownHours = states.filter(s => s !== 'unknown').length
-  const onlineHours = states.filter(s => s === 'online').length
-  const onlineRatio = knownHours ? Math.round((onlineHours / knownHours) * 100) : null
+  // 偶尔丢包不算掉线，仅完全不通 (fully_offline) 算作离线影响在线率
+  const offlineHours = states.filter(s => s === 'fully_offline').length
+  const onlineRatio = knownHours ? Math.round(((knownHours - offlineHours) / knownHours) * 100) : null
 
   return (
     <div className="rounded-xl border border-emerald-400/25 bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-slate-950 p-4 space-y-3">

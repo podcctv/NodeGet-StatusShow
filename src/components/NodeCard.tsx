@@ -63,8 +63,9 @@ const SLOT_COLORS: Record<SlotState, string> = {
 function OnlineStrip({ rows }: { rows: TaskQueryResult[] }) {
   const states = useMemo(() => buildSlotStates(rows), [rows])
   const known = states.filter(s => s !== 'unknown').length
-  const good = states.filter(s => s === 'online').length
-  const ratio = known ? Math.round((good / known) * 100) : null
+  // 偶尔丢包不算掉线，仅完全不通 (offline) 算作离线影响在线率
+  const offline = states.filter(s => s === 'offline').length
+  const ratio = known ? Math.round(((known - offline) / known) * 100) : null
 
   return (
     <div className="rounded-md border border-border/50 bg-black/15 px-2.5 py-2">
