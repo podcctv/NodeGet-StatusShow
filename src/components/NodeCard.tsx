@@ -20,7 +20,7 @@ export function NodeCard({ node }: { node: Node }) {
     <a href={`#${encodeURIComponent(node.uuid)}`} className="block">
       <Card
         className={cn(
-          'p-5 transition duration-300 hover:border-primary/60 hover:-translate-y-1.5 hover:scale-[1.018] flex flex-col gap-3.5 cyber-card',
+          'p-4 transition duration-300 hover:border-primary/60 hover:-translate-y-1 hover:scale-[1.01] flex flex-col gap-2.5 cyber-card',
           node.online && 'cyber-card-active',
           !node.online && 'opacity-60',
         )}
@@ -36,12 +36,12 @@ export function NodeCard({ node }: { node: Node }) {
           <Flag code={node.meta?.region} className="shrink-0" />
         </div>
         {(os || virt) && <div className="font-mono text-xs text-muted-foreground truncate">{[os, virt].filter(Boolean).join(' · ')}</div>}
-        <div className="flex flex-col gap-3 rounded-xl border border-cyan-300/15 bg-slate-950/30 px-3 py-2.5 shadow-[inset_0_0_24px_rgba(45,212,191,0.08)]">
+        <div className="flex flex-col gap-2 rounded-xl border border-cyan-300/15 bg-slate-950/30 px-3 py-2 shadow-[inset_0_0_24px_rgba(45,212,191,0.08)]">
           <Metric label="CPU" value={u.cpu} sub={cpu || null} subTitle={cpu || undefined} />
           <Metric label="内存" value={u.mem} sub={u.memTotal ? `${bytes(u.memUsed)} / ${bytes(u.memTotal)}` : null} />
           <Metric label="磁盘" value={u.disk} sub={u.diskTotal ? `${bytes(u.diskUsed)} / ${bytes(u.diskTotal)}` : null} />
         </div>
-        <div className="pt-3 border-t border-cyan-300/20 border-dashed font-mono text-xs text-slate-300/90 space-y-1.5">
+        <div className="pt-2 border-t border-cyan-300/20 border-dashed font-mono text-xs text-slate-300/90 space-y-1">
           <div className="flex items-center gap-3">
             <Stat icon={ArrowDown}>{bytes(u.netIn || 0)}/s</Stat>
             <Stat icon={ArrowUp}>{bytes(u.netOut || 0)}/s</Stat>
@@ -77,7 +77,7 @@ function Metric({
 }) {
   const percent = pct(value)
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <div className="flex items-center text-xs font-mono">
         <span className="text-slate-300">{label}</span>
         {sub ? (

@@ -52,6 +52,7 @@ export interface DynamicSummary {
   used_swap?: number
   total_swap?: number
   total_space?: number
+  used_space?: number
   available_space?: number
   receive_speed?: number
   transmit_speed?: number
