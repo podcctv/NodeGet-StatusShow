@@ -1,11 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+
+type Theme = 'light' | 'dark'
+
+const KEY = 'nodeget.theme'
+
+function initial(): Theme {
+  const stored = localStorage.getItem(KEY)
+  if (stored === 'light' || stored === 'dark') return stored
+  return 'dark'
+}
 
 export function useTheme() {
-  // Cyberpunk theme is always dark
-  useEffect(() => {
-    document.documentElement.classList.add('dark')
-    localStorage.setItem('nodeget.theme', 'dark')
-  }, [])
+  const [theme, setTheme] = useState<Theme>(initial)
 
-  return { theme: 'dark' as const, toggle: () => {} }
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    localStorage.setItem(KEY, theme)
+  }, [theme])
+
+  return { theme, toggle: () => setTheme(t => (t === 'dark' ? 'light' : 'dark')) }
 }

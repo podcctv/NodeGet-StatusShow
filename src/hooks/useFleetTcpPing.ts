@@ -9,8 +9,9 @@ const REFRESH_MS = 60_000
 const QUERY_TIMEOUT_MS = 20_000
 const MAX_NODES = 160
 const DAY_MS = 24 * 60 * 60 * 1000
-/** Max results for the global (no-uuid) query */
 const GLOBAL_LIMIT = 5000
+/** Delay before first ping fetch — let main data render first */
+const INITIAL_DELAY_MS = 3000
 
 function clean(rows: TaskQueryResult[] | undefined): TaskQueryResult[] {
   return (rows ?? [])
@@ -36,17 +37,12 @@ function normalizeTs(ts: number) {
   return ts < 1_000_000_000_000 ? ts * 1000 : ts
 }
 
-/**
- * Client-side filter: keep only rows that look like tcp_ping tasks.
- * Mirrors detail page's matchesLatencyType logic.
- */
 function isTcpPingRow(row: TaskQueryResult): boolean {
   const taskType = latencyTaskType(row)
   if (taskType) return taskType === 'tcp_ping'
   return latencyValue(row, 'tcp_ping') != null
 }
 
-/** Compute hourly buckets (24 hours) from task query results */
 function computeHourlyBuckets(rows: TaskQueryResult[], type: 'tcp_ping'): HourlyBucket[] {
   const buckets: { sum: number; count: number }[] = Array.from({ length: 24 }, () => ({ sum: 0, count: 0 }))
 
@@ -79,7 +75,6 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
   const [loading, setLoading] = useState(false)
   const [readable, setReadable] = useState(true)
 
-  // Set of known UUIDs for filtering
   const uuidSet = useMemo(
     () => new Set(nodes.slice(0, MAX_NODES).map(n => n.uuid)),
     [nodes],
@@ -96,23 +91,18 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       const now = Date.now()
       const dayWindow: [number, number] = [now - DAY_MS, now]
 
-      // Strategy: query ALL tcp_ping tasks globally (no uuid filter) per backend.
-      // This avoids N per-node queries and gets all data in 2-3 calls per backend.
-      // Then filter client-side by known UUIDs.
+      // Query all tcp_ping tasks globally per backend (not per-node)
       const jobs = pool.entries.flatMap(entry => [
-        // 1) All tcp_ping tasks in the last 24h (most reliable)
         taskQuery(
           entry.client,
           [{ timestamp_from_to: dayWindow }, { type: 'tcp_ping' }],
           QUERY_TIMEOUT_MS,
         ),
-        // 2) Recent tcp_ping by limit (fallback for backends without time filter)
         taskQuery(
           entry.client,
           [{ type: 'tcp_ping' }, { limit: GLOBAL_LIMIT }],
           QUERY_TIMEOUT_MS,
         ),
-        // 3) All recent tasks without type filter (fallback for backends without type support)
         taskQuery(
           entry.client,
           [{ timestamp_from_to: dayWindow }, { limit: GLOBAL_LIMIT }],
@@ -130,7 +120,6 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       )
       setReadable(!denied)
 
-      // Merge, filter by tcp_ping type, then filter by known UUIDs
       const allRows = mergeRows(settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []))
       const nextRows = allRows.filter(r => isTcpPingRow(r) && uuidSet.has(r.uuid))
 
@@ -138,11 +127,29 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       setLoading(false)
     }
 
-    fetchOnce()
-    const timer = setInterval(fetchOnce, REFRESH_MS)
+    // ★ Delay initial fetch so main node data renders first
+    const initialTimer = setTimeout(() => {
+      if (cancelled) return
+      fetchOnce()
+    }, INITIAL_DELAY_MS)
+
+    // Then refresh periodically
+    const refreshTimer = setTimeout(() => {
+      if (cancelled) return
+      const interval = setInterval(() => {
+        if (!cancelled) fetchOnce()
+      }, REFRESH_MS)
+      // Store for cleanup
+      cleanupInterval = interval
+    }, INITIAL_DELAY_MS + 1000)
+
+    let cleanupInterval: ReturnType<typeof setInterval> | null = null
+
     return () => {
       cancelled = true
-      clearInterval(timer)
+      clearTimeout(initialTimer)
+      clearTimeout(refreshTimer)
+      if (cleanupInterval) clearInterval(cleanupInterval)
     }
   }, [pool, uuidKey])
 
