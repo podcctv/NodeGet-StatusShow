@@ -28,21 +28,31 @@ function pickValue(row: TaskQueryResult, type: LatencyType): number | null {
 
   const keys =
     type === 'tcp_ping'
-      ? ['tcp_ping', 'tcpPing', 'tcp', 'latency', 'value', 'delay']
-      : ['ping', 'icmp_ping', 'icmpPing', 'latency', 'value', 'delay']
+      ? ['tcp_ping', 'tcpPing', 'tcp', 'latency', 'value', 'delay', 'avg', 'min', 'time', 'duration']
+      : ['ping', 'icmp_ping', 'icmpPing', 'latency', 'value', 'delay', 'avg', 'min', 'time', 'duration']
+
+  const toNum = (v: unknown) => {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null
+    if (typeof v === 'string') {
+      const n = Number(v)
+      return Number.isFinite(n) ? n : null
+    }
+    return null
+  }
 
   for (const key of keys) {
-    const v = payload[key]
-    if (typeof v === 'number') return v
+    const v = toNum(payload[key])
+    if (v != null) return v
   }
 
   for (const v of Object.values(payload)) {
-    if (typeof v === 'number') return v
+    const top = toNum(v)
+    if (top != null) return top
     if (v && typeof v === 'object') {
       const nested = v as Record<string, unknown>
       for (const key of keys) {
-        const nv = nested[key]
-        if (typeof nv === 'number') return nv
+        const nv = toNum(nested[key])
+        if (nv != null) return nv
       }
     }
   }
