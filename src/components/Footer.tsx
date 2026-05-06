@@ -16,15 +16,15 @@ export function Footer({ text }: { text?: string }) {
   const outdated = latest != null && latest !== __APP_VERSION__
 
   return (
-    <footer className="border-t">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex justify-end gap-4 text-xs text-muted-foreground">
-        <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">
+    <footer className="cyber-footer">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex justify-end gap-4 text-xs font-mono text-cyan-600/60">
+        <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-cyan-400 transition-colors">
           {text || 'Powered by NodeGet'}
         </a>
         <span>
           v{__APP_VERSION__}
           {outdated && (
-            <a href={`${REPO}/releases`} target="_blank" rel="noreferrer" className="ml-1 text-destructive">
+            <a href={`${REPO}/releases`} target="_blank" rel="noreferrer" className="ml-1 text-red-400 hover:text-red-300">
               (Need Update)
             </a>
           )}

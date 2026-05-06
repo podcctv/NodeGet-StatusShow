@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Search as SearchIcon, X } from 'lucide-react'
 import { Search } from './Search'
 import { ViewToggle } from './ViewToggle'
-import { ThemeToggle } from './ThemeToggle'
 import { SortMenu } from './SortMenu'
 import { Button } from './ui/button'
 import type { Sort, View } from '../types'
@@ -41,19 +40,19 @@ export function Navbar({ siteName, logo, query, onQuery, view, onView, sort, onS
   return (
     <header
       ref={headerRef}
-      className={`sticky top-0 z-10 transition-[background-color,backdrop-filter,border-color] duration-200 ${
-        stuck
-          ? 'border-b border-border/40 backdrop-blur bg-background/70'
-          : 'border-b border-transparent'
+      className={`sticky top-0 z-10 transition-all duration-300 ${
+        stuck ? 'cyber-nav-stuck' : 'cyber-nav'
       }`}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-6 py-3">
         <a
           href="./"
-          className="flex items-center gap-2 min-w-0 shrink-0 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2.5 min-w-0 shrink-0 group"
         >
-          {logo && <img src={logo} alt="" className="w-6 h-6 rounded shrink-0" />}
-          <span className="font-semibold tracking-wide truncate">{siteName}</span>
+          {logo && <img src={logo} alt="" className="w-7 h-7 rounded shrink-0 opacity-90 group-hover:opacity-100 transition-opacity" />}
+          <span className="font-cyber font-semibold tracking-widest truncate text-neon neon-glow text-sm uppercase">
+            {siteName}
+          </span>
         </a>
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <div className="hidden sm:block">
@@ -62,7 +61,7 @@ export function Navbar({ siteName, logo, query, onQuery, view, onView, sort, onS
           <Button
             variant="outline"
             size="icon"
-            className="sm:hidden"
+            className="sm:hidden border-cyan-500/30 hover:border-cyan-400/50 hover:bg-cyan-400/10"
             onClick={() => setSearchOpen(o => !o)}
             aria-label={searchOpen ? '关闭搜索' : '搜索'}
           >
@@ -70,7 +69,6 @@ export function Navbar({ siteName, logo, query, onQuery, view, onView, sort, onS
           </Button>
           <SortMenu value={sort} onChange={onSort} />
           <ViewToggle value={view} onChange={onView} />
-          <ThemeToggle />
         </div>
       </div>
 
