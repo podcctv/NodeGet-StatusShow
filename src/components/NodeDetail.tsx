@@ -73,7 +73,7 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
     return () => el.removeEventListener('scroll', onScroll)
   }, [node])
 
-  const { pingData, tcpData, loading: latencyLoading } = useNodeLatency(
+  const { pingData, tcpData, statusData, loading: latencyLoading } = useNodeLatency(
     pool,
     node?.source ?? null,
     node?.uuid ?? null,
@@ -203,7 +203,7 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
         <Section title="状态面板">
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-3 sm:gap-4">
             <div className="xl:col-span-3">
-              <OnlinePanel rows={pingData.length ? pingData : tcpData} />
+              <OnlinePanel rows={statusData} loading={latencyLoading} nodeOnline={node.online} />
             </div>
             <div className="xl:col-span-2">
               <TcpMiniPanel rows={tcpData} />
@@ -264,7 +264,7 @@ export function NodeDetail({ node, onClose, showSource, pool }: Props) {
   )
 }
 
-type HourState = 'online' | 'partial_offline' | 'fully_offline'
+type HourState = 'online' | 'partial_offline' | 'fully_offline' | 'unknown'
 
 function buildHourState(rows: TaskQueryResult[]): HourState[] {
   const now = Date.now()
@@ -277,7 +277,7 @@ function buildHourState(rows: TaskQueryResult[]): HourState[] {
       return ts >= start && ts < end
     })
     if (!bucket.length) {
-      states.push('fully_offline')
+      states.push('unknown')
       continue
     }
     const fail = bucket.filter(r => !r.success).length
@@ -288,16 +288,27 @@ function buildHourState(rows: TaskQueryResult[]): HourState[] {
   return states
 }
 
-function OnlinePanel({ rows }: { rows: TaskQueryResult[] }) {
+function OnlinePanel({
+  rows,
+  loading,
+  nodeOnline,
+}: {
+  rows: TaskQueryResult[]
+  loading: boolean
+  nodeOnline: boolean
+}) {
   const states = useMemo(() => buildHourState(rows), [rows])
+  const knownHours = states.filter(s => s !== 'unknown').length
   const onlineHours = states.filter(s => s === 'online').length
-  const onlineRatio = Math.round((onlineHours / 24) * 100)
+  const onlineRatio = knownHours ? Math.round((onlineHours / knownHours) * 100) : null
 
   return (
     <div className="rounded-xl border border-emerald-400/25 bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-slate-950 p-4 space-y-3">
       <div className="flex items-center justify-between text-sm mb-2">
         <span className="text-emerald-300">在线状态 · 24小时</span>
-        <span className="font-mono text-emerald-300">{onlineRatio}%</span>
+        <span className="font-mono text-emerald-300">
+          {onlineRatio == null ? (loading ? '同步中' : nodeOnline ? '在线' : '未知') : `${onlineRatio}%`}
+        </span>
       </div>
       <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(24, minmax(0,1fr))' }}>
         {states.map((state, idx) => (
@@ -309,6 +320,7 @@ function OnlinePanel({ rows }: { rows: TaskQueryResult[] }) {
               state === 'online' && 'bg-emerald-400/85',
               state === 'partial_offline' && 'bg-yellow-400/85',
               state === 'fully_offline' && 'bg-red-500/90',
+              state === 'unknown' && 'bg-slate-600/35',
             )}
           />
         ))}
@@ -317,6 +329,7 @@ function OnlinePanel({ rows }: { rows: TaskQueryResult[] }) {
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-400/85" />在线</span>
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-yellow-400/85" />有离线</span>
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-red-500/90" />整小时离线</span>
+        <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-slate-600/60" />无记录</span>
       </div>
     </div>
   )

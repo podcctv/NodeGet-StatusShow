@@ -35,7 +35,25 @@ export function latencySeriesName(row: TaskQueryResult) {
   return row.task_id ? `任务 #${row.task_id}` : '未知来源'
 }
 
-function pickValue(row: TaskQueryResult, type: LatencyType): number | null {
+export function latencyTaskType(row: TaskQueryResult): LatencyType | null {
+  const event = row.task_event_type
+  if (event && typeof event === 'object') {
+    const payload = event as Record<string, unknown>
+    if ('tcp_ping' in payload || 'tcpPing' in payload) return 'tcp_ping'
+    if ('ping' in payload || 'icmp_ping' in payload || 'icmpPing' in payload) return 'ping'
+  }
+
+  const payload = row.task_event_result
+  if (payload && typeof payload === 'object') {
+    const result = payload as Record<string, unknown>
+    if ('tcp_ping' in result || 'tcpPing' in result) return 'tcp_ping'
+    if ('ping' in result || 'icmp_ping' in result || 'icmpPing' in result) return 'ping'
+  }
+
+  return null
+}
+
+export function latencyValue(row: TaskQueryResult, type: LatencyType): number | null {
   if (!row.success) return null
   const payload = row.task_event_result
   if (!payload) return null
@@ -115,7 +133,7 @@ export function buildLatencyChart(rows: TaskQueryResult[], type: LatencyType) {
       for (const n of names) pt[n] = null
       byTs.set(t, pt)
     }
-    pt[latencySeriesName(r)] = pickValue(r, type)
+    pt[latencySeriesName(r)] = latencyValue(r, type)
   }
 
   const data = [...byTs.values()].sort((a, b) => a.t - b.t)
@@ -136,7 +154,7 @@ export function computeLatencyStats(rows: TaskQueryResult[], type: LatencyType):
     const list = rows.filter(r => latencySeriesName(r) === name)
     const vals: number[] = []
     for (const r of list) {
-      const v = pickValue(r, type)
+      const v = latencyValue(r, type)
       if (v != null) vals.push(v)
     }
 
