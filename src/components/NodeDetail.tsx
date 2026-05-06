@@ -510,9 +510,20 @@ interface LatencyBlockProps {
 
 const ms = (v: number) => `${v.toFixed(1)} ms`
 
+function summarizeStats(stats: LatencyStats[]) {
+  const valid = stats.filter(s => s.avg != null)
+  if (!valid.length) return null
+  const avg = valid.reduce((sum, s) => sum + (s.avg ?? 0), 0) / valid.length
+  const jitterVals = valid.flatMap(s => s.jitter == null ? [] : [s.jitter])
+  const jitter = jitterVals.length ? jitterVals.reduce((sum, v) => sum + v, 0) / jitterVals.length : null
+  const loss = valid.reduce((sum, s) => sum + s.lossRate, 0) / valid.length
+  return { avg, jitter, loss }
+}
+
 function LatencyBlock({ title, rows, type, loading, error }: LatencyBlockProps) {
   const { data, series } = useMemo(() => buildLatencyChart(rows, type), [rows, type])
   const stats = useMemo(() => computeLatencyStats(rows, type), [rows, type])
+  const summary = useMemo(() => summarizeStats(stats), [stats])
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
   const empty = data.length === 0
 
@@ -528,6 +539,13 @@ function LatencyBlock({ title, rows, type, loading, error }: LatencyBlockProps) 
 
   return (
     <Section title={`${title} · 近 1 小时`} className="latency-panel">
+      {summary && (
+        <div className="-mt-1 mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-cyan-300/10 pb-3 font-mono text-[11px] text-cyan-100/70">
+          <span>avg <b className="text-cyan-50">{ms(summary.avg)}</b></span>
+          <span>jitter <b className="text-cyan-50">{summary.jitter == null ? '—' : ms(summary.jitter)}</b></span>
+          <span>loss <b className={cn(summary.loss >= 5 ? 'text-red-400' : 'text-cyan-50')}>{summary.loss.toFixed(1)}%</b></span>
+        </div>
+      )}
       <div className="relative h-56 sm:h-64 rounded-md border border-cyan-300/10 bg-black/20 p-2">
         {empty && (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
