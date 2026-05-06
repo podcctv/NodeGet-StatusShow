@@ -6,7 +6,7 @@ import type { Node } from '../types'
 
 interface Props {
   nodes: Node[]
-  onOpen?: (uuid: string) => void
+  onOpen?: (id: string) => void
 }
 
 const MAP_W = 900
@@ -135,7 +135,7 @@ export function WorldMap({ nodes, onOpen }: Props) {
                 onMouseLeave={scheduleClose}
                 onClick={(e: any) => {
                   e.stopPropagation?.()
-                  if (!isCluster) onOpen?.(node.uuid)
+                  if (!isCluster) onOpen?.(node.id)
                 }}
                 style={CURSOR}
               >
@@ -227,7 +227,7 @@ function ClusterList({
   lng: number
   state: 'open' | 'closed'
   onAnimationEnd?: () => void
-  onPick: (uuid: string) => void
+  onPick: (id: string) => void
   onMouseEnter?: () => void
   onMouseLeave?: () => void
 }) {

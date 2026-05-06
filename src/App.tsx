@@ -155,7 +155,7 @@ export function App() {
     })
   }, [nodes, query, activeTag, activeRegion, sort, regions])
 
-  const selectedNode = selected ? nodes.get(selected) || null : null
+  const selectedNode = selected ? nodes.get(selected) || [...nodes.values()].find(n => n.uuid === selected) || null : null
 
   if (configError) {
     return (
