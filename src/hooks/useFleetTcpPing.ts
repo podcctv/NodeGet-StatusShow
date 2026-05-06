@@ -76,6 +76,37 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
     }
   }, [pool, ids])
 
+  const byUuid = useMemo(() => {
+    const nodeMap = new Map<string, TaskQueryResult[]>()
+    for (const row of rows) {
+      const value = latencyValue(row, 'tcp_ping')
+      if (value == null) continue
+      const list = nodeMap.get(row.uuid) ?? []
+      list.push(row)
+      nodeMap.set(row.uuid, list)
+    }
+
+    const out = new Map<string, Array<{ name: string; avg: number | null; loss: number | null; count: number }>>()
+    for (const [uuid, list] of nodeMap) {
+      const groups = new Map<string, TaskQueryResult[]>()
+      for (const row of list) {
+        const carrier = carrierOf(latencySeriesName(row))
+        const group = groups.get(carrier) ?? []
+        group.push(row)
+        groups.set(carrier, group)
+      }
+      out.set(uuid, ['移动', '电信', '联通'].map(name => {
+        const group = groups.get(name) ?? []
+        const stats = computeLatencyStats(group, 'tcp_ping')
+        const vals = stats.flatMap(s => s.avg == null ? [] : [s.avg])
+        const avg = vals.length ? vals.reduce((sum, v) => sum + v, 0) / vals.length : null
+        const loss = stats.length ? stats.reduce((sum, s) => sum + s.lossRate, 0) / stats.length : null
+        return { name, avg, loss, count: group.length }
+      }))
+    }
+    return out
+  }, [rows])
+
   const carriers = useMemo(() => {
     const groups = new Map<string, TaskQueryResult[]>()
     for (const row of rows) {
@@ -97,5 +128,5 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
     })
   }, [rows])
 
-  return { carriers, loading, readable, hasData: rows.length > 0 }
+  return { carriers, byUuid, loading, readable, hasData: rows.length > 0 }
 }

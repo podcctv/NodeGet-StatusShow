@@ -13,12 +13,23 @@ import { Badge } from './ui/badge'
 import { Card } from './ui/card'
 import { Progress } from './ui/progress'
 import { Flag } from './Flag'
+import { FleetTcpPingPanel } from './FleetTcpPingPanel'
 import { bytes, pct, relativeAge, uptime } from '../utils/format'
 import { cpuLabel, deriveUsage, displayName, distroLogo, osLabel, virtLabel } from '../utils/derive'
 import { cn, loadColor, loadTextColor } from '../utils/cn'
 import type { Node } from '../types'
 import type { ReactNode } from 'react'
-export function NodeCard({ node }: { node: Node }) {
+export function NodeCard({
+  node,
+  tcpPing,
+  tcpPingLoading,
+  tcpPingReadable,
+}: {
+  node: Node
+  tcpPing?: Array<{ name: string; avg: number | null; loss: number | null; count: number }>
+  tcpPingLoading?: boolean
+  tcpPingReadable?: boolean
+}) {
   const u = deriveUsage(node)
   const tags = Array.isArray(node.meta?.tags) ? node.meta.tags : []
   const os = osLabel(node)
@@ -82,6 +93,10 @@ export function NodeCard({ node }: { node: Node }) {
             <StatBox icon={ArrowDown} label="DOWN">{bytes(u.netIn || 0)}/s</StatBox>
             <StatBox icon={ArrowUp} label="UP">{bytes(u.netOut || 0)}/s</StatBox>
           </div>
+
+          {tcpPing && (
+            <FleetTcpPingPanel rows={tcpPing} loading={tcpPingLoading} readable={tcpPingReadable} />
+          )}
 
           <div className="flex items-center gap-3 border-t border-cyan-300/20 pt-3 font-mono text-[11px] text-slate-300/80">
             <Stat icon={Clock}>{uptime(u.uptime)}</Stat>
