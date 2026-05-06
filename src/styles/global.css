@@ -147,17 +147,13 @@
 .progress-glow {
   position: relative;
   box-shadow:
-    0 0 10px rgba(45, 212, 191, 0.45),
-    0 0 22px rgba(56, 189, 248, 0.3);
+    0 0 8px rgba(45, 212, 191, 0.28),
+    0 0 16px rgba(56, 189, 248, 0.18);
+  transition: width 420ms ease, box-shadow 420ms ease;
 }
 
 .progress-glow::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.45) 48%, transparent 100%);
-  mix-blend-mode: screen;
-  animation: progress-scan 2.4s linear infinite;
+  content: none;
 }
 .cyber-card::before {
   content: '';
@@ -206,9 +202,7 @@
   display: none;
 }
 
-.cyber-card-active {
-  animation: card-breathe 3.8s ease-in-out infinite;
-}
+.cyber-card-active { animation: none; }
 .cyber-orb {
   position: absolute;
   width: 8.25rem;
