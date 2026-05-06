@@ -91,60 +91,44 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       const now = Date.now()
       const dayWindow: [number, number] = [now - DAY_MS, now]
 
-      // Concurrency limiter to avoid overwhelming the backend
-      const executeBatched = async <T,>(tasks: (() => Promise<T>)[], limit: number) => {
-        const results: PromiseSettledResult<T>[] = []
-        let i = 0
-        const worker = async () => {
-          while (i < tasks.length && !cancelled) {
-            const idx = i++
+      // Request each node sequentially and update state incrementally ("请求一个节点 显示一个节点")
+      const fetchAllSequentially = async () => {
+        for (const uuid of uuidSet) {
+          if (cancelled) break
+          for (const entry of pool.entries) {
+            if (cancelled) break
             try {
-              results[idx] = { status: 'fulfilled', value: await tasks[idx]() }
-            } catch (reason) {
-              results[idx] = { status: 'rejected', reason }
+              // 20s interval = 3/min = 180/hr = 4320/day per network. 3 networks = 12960 rows. Limit 15000.
+              const res = await taskQuery(
+                entry.client,
+                [{ uuid }, { timestamp_from_to: dayWindow }, { type: 'tcp_ping' }, { limit: 15000 }],
+                QUERY_TIMEOUT_MS,
+              )
+              if (cancelled) return
+
+              const validRows = (res ?? []).filter(r => isTcpPingRow(r))
+              if (validRows.length > 0) {
+                setRows(prev => {
+                  const combined = mergeRows([prev, validRows])
+                  const dayAgo = Date.now() - DAY_MS
+                  return combined.filter(r => {
+                    const ts = r.timestamp < 1_000_000_000_000 ? r.timestamp * 1000 : r.timestamp
+                    return ts >= dayAgo
+                  })
+                })
+              }
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err)
+              if (/permission denied|missing task/i.test(msg)) {
+                setReadable(false)
+              }
             }
           }
         }
-        await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker))
-        return results
       }
 
-      // Query per UUID sequentially (concurrency=1) to prevent backend throttling
-      const jobs: (() => Promise<TaskQueryResult[]>)[] = []
-      for (const uuid of uuidSet) {
-        for (const entry of pool.entries) {
-          jobs.push(() => taskQuery(
-            entry.client,
-            // Provide both time window and a high fallback limit per node (5000 is enough for 24h even at 1 ping/min)
-            [{ uuid }, { timestamp_from_to: dayWindow }, { type: 'tcp_ping' }, { limit: 5000 }],
-            QUERY_TIMEOUT_MS,
-          ))
-        }
-      }
-
-      const settled = await executeBatched(jobs, 1) // Concurrency: 1 (Sequential)
-      if (cancelled) return
-
-      const denied = settled.some(
-        r => r.status === 'rejected' && /permission denied|missing task/i.test(
-          r.reason instanceof Error ? r.reason.message : String(r.reason),
-        ),
-      )
-      setReadable(!denied)
-
-      const allRows = mergeRows(settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []))
-      const nextRows = allRows.filter(r => isTcpPingRow(r) && uuidSet.has(r.uuid))
-
-      setRows(prev => {
-        if (!nextRows.length) return prev
-        const combined = mergeRows([prev, nextRows])
-        const dayAgo = Date.now() - DAY_MS
-        return combined.filter(r => {
-          const ts = r.timestamp < 1_000_000_000_000 ? r.timestamp * 1000 : r.timestamp
-          return ts >= dayAgo
-        })
-      })
-      setLoading(false)
+      await fetchAllSequentially()
+      if (!cancelled) setLoading(false)
     }
 
     // ★ Delay initial fetch so main node data renders first
