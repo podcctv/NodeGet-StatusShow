@@ -68,7 +68,7 @@ function OnlineStrip({ rows }: { rows: TaskQueryResult[] }) {
   const ratio = known ? Math.round(((known - offline) / known) * 100) : null
 
   return (
-    <div className="rounded-md border border-border/50 bg-black/15 px-2.5 py-2">
+    <div className="rounded-md border border-border/50 bg-black/5 dark:bg-black/15 px-2.5 py-2">
       <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1.5">
         <span>24h 在线</span>
         <span className={ratio != null && ratio < 80 ? 'text-red-400' : ratio != null && ratio < 95 ? 'text-yellow-400' : 'text-emerald-400'}>
@@ -127,7 +127,7 @@ export function NodeCard({
           <div className={cn("flex flex-col", !node.online && "grayscale opacity-60")}>
             {/* Header */}
             <div className="flex items-start gap-3">
-            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border/40 bg-black/25">
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border/40 bg-black/5 dark:bg-black/25">
               {logo ? (
                 <img src={logo} alt="" className="h-7 w-7 object-contain" loading="lazy" />
               ) : (
@@ -150,7 +150,7 @@ export function NodeCard({
 
           {/* System Info */}
           {(os || cpu) && (
-            <div className="mt-3.5 grid grid-cols-1 gap-1.5 rounded-md border border-border/40 bg-black/10 px-3 py-2 text-[11px] font-mono text-foreground/70">
+            <div className="mt-3.5 grid grid-cols-1 gap-1.5 rounded-md border border-border/40 bg-black/5 dark:bg-black/10 px-3 py-2 text-[11px] font-mono text-foreground/70">
               {os && <Info icon={Server}>{os}</Info>}
               {cpu && <Info icon={Cpu}>{cpu}</Info>}
             </div>
@@ -242,7 +242,7 @@ function Metric({
   const clampedForBar = numericValue != null ? Math.min(100, numericValue) : undefined
   const percent = pct(numericValue)
   return (
-    <div className="rounded-md border border-border/30 bg-black/15 p-2">
+    <div className="rounded-md border border-border/30 bg-black/5 dark:bg-black/15 p-2">
       <div className="mb-1.5 flex items-center justify-between gap-1">
         <span className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
           <Icon className="h-3 w-3" />
@@ -252,7 +252,7 @@ function Metric({
       </div>
       <Progress
         value={clampedForBar}
-        className="h-1.5 rounded-sm bg-slate-950/60 ring-1 ring-white/5"
+        className="h-1.5 rounded-sm bg-black/10 dark:bg-slate-950/60 ring-1 ring-black/5 dark:ring-white/5"
         indicatorClassName={cn(loadColor(numericValue), 'progress-glow')}
       />
     </div>
@@ -261,7 +261,7 @@ function Metric({
 
 function StatBox({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
   return (
-    <div className="rounded-md border border-border/30 bg-black/10 px-2.5 py-2">
+    <div className="rounded-md border border-border/30 bg-black/5 dark:bg-black/10 px-2.5 py-2">
       <div className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
         <Icon className="h-3 w-3" />
         {label}

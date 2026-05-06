@@ -54,7 +54,7 @@ interface Props {
 export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
   const hasRows = rows.some(r => r.count > 0)
   return (
-    <div className="retro-terminal rounded-md border border-border/60 bg-black/20 px-3 py-3">
+    <div className="retro-terminal rounded-md border border-border/60 bg-black/5 dark:bg-black/20 px-3 py-3">
       <div className="mb-3 flex items-center justify-between text-[11px] font-mono font-semibold tracking-wide text-foreground/70">
         <span className="inline-flex items-center gap-1.5">
           <Activity className="h-3.5 w-3.5 text-emerald-400" />
@@ -85,7 +85,7 @@ export function FleetTcpPingPanel({ rows, loading, readable = true }: Props) {
                 {item.name}
               </span>
               <div
-                className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[2px] rounded-sm bg-black/40 p-[3px]"
+                className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[2px] rounded-sm bg-black/10 dark:bg-black/40 p-[3px]"
                 title="24h 延迟热力图 · 每格=1小时"
               >
                 {buckets.map((avg, idx) => (
