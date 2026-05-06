@@ -117,15 +117,16 @@ export function NodeCard({
         className={cn(
           'p-0 h-full flex flex-col transition duration-300 cyber-card',
           node.online && 'hover:-translate-y-1 hover:scale-[1.01] cyber-card-active',
-          !node.online && 'opacity-60 pointer-events-none select-none cyber-card-offline',
+          !node.online && 'pointer-events-none select-none cyber-card-offline',
         )}
       >
         <div className="cyber-grid" aria-hidden />
         <div className="cyber-scan" aria-hidden />
 
         <div className="relative z-10 p-4 pb-3 flex flex-col flex-1">
-          {/* Header */}
-          <div className="flex items-start gap-3">
+          <div className={cn("flex flex-col", !node.online && "grayscale opacity-60")}>
+            {/* Header */}
+            <div className="flex items-start gap-3">
             <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border/40 bg-black/25">
               {logo ? (
                 <img src={logo} alt="" className="h-7 w-7 object-contain" loading="lazy" />
@@ -179,6 +180,7 @@ export function NodeCard({
               <OnlineStrip rows={statusRows} />
             </div>
           )}
+          </div>
 
           {/* Footer - grows to push to bottom */}
           <div className="mt-3.5 flex-1 flex items-end">
@@ -198,7 +200,7 @@ export function NodeCard({
 
           {/* Tags */}
           {tags.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className={cn("mt-3 flex flex-wrap gap-1.5", !node.online && "grayscale opacity-60")}>
               {tags.slice(0, 4).map(t => (
                 <Badge key={t} variant="outline" className="border-border/40 bg-muted/30 text-[10px] text-foreground/70">
                   {t}

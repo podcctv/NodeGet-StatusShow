@@ -123,7 +123,15 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       const allRows = mergeRows(settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []))
       const nextRows = allRows.filter(r => isTcpPingRow(r) && uuidSet.has(r.uuid))
 
-      setRows(prev => nextRows.length ? nextRows : prev)
+      setRows(prev => {
+        if (!nextRows.length) return prev
+        const combined = mergeRows([prev, nextRows])
+        const dayAgo = Date.now() - DAY_MS
+        return combined.filter(r => {
+          const ts = r.timestamp < 1_000_000_000_000 ? r.timestamp * 1000 : r.timestamp
+          return ts >= dayAgo
+        })
+      })
       setLoading(false)
     }
 
