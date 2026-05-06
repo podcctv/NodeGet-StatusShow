@@ -10,8 +10,55 @@ const QUERY_TIMEOUT_MS = 20_000
 const MAX_NODES = 160
 const DAY_MS = 24 * 60 * 60 * 1000
 const GLOBAL_LIMIT = 100_000
-/** Delay before first ping fetch — let main data render first */
 const INITIAL_DELAY_MS = 3000
+
+/* ── IndexedDB Caching ── */
+const DB_NAME = 'NodeGetCache'
+const STORE_NAME = 'tcp_ping'
+const DB_VERSION = 1
+
+function getDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(STORE_NAME)) {
+        req.result.createObjectStore(STORE_NAME)
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function saveRowsToCache(rows: TaskQueryResult[]) {
+  try {
+    const db = await getDB()
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    tx.objectStore(STORE_NAME).put(rows, 'latest_rows')
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = resolve
+      tx.onerror = () => reject(tx.error)
+    })
+  } catch (e) {
+    console.warn('Failed to save tcp_ping cache to IDB:', e)
+  }
+}
+
+async function loadRowsFromCache(): Promise<TaskQueryResult[]> {
+  try {
+    const db = await getDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const req = tx.objectStore(STORE_NAME).get('latest_rows')
+      req.onsuccess = () => resolve(req.result || [])
+      req.onerror = () => reject(req.error)
+    })
+  } catch (e) {
+    console.warn('Failed to load tcp_ping cache from IDB:', e)
+    return []
+  }
+}
+/* ── End IndexedDB ── */
 
 function clean(rows: TaskQueryResult[] | undefined): TaskQueryResult[] {
   return (rows ?? [])
@@ -81,10 +128,32 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
   )
   const uuidKey = useMemo(() => [...uuidSet].sort().join('|'), [uuidSet])
 
+  // Save to cache whenever rows change
+  useEffect(() => {
+    if (rows.length > 0) {
+      saveRowsToCache(rows)
+    }
+  }, [rows])
+
   useEffect(() => {
     setReadable(true)
     if (!pool || !uuidSet.size) return
     let cancelled = false
+
+    // Instantly load from cache first
+    loadRowsFromCache().then(cached => {
+      if (cancelled) return
+      if (cached && cached.length > 0) {
+        const dayAgo = Date.now() - DAY_MS
+        const validCached = cached.filter(r => {
+          const ts = r.timestamp < 1_000_000_000_000 ? r.timestamp * 1000 : r.timestamp
+          return ts >= dayAgo && uuidSet.has(r.uuid)
+        })
+        if (validCached.length > 0) {
+          setRows(prev => prev.length === 0 ? validCached : mergeRows([validCached, prev]))
+        }
+      }
+    })
 
     const fetchOnce = async () => {
       setLoading(true)
