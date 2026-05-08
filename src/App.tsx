@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert'
 import { useConfig } from './hooks/useConfig'
@@ -9,10 +9,13 @@ import { Footer } from './components/Footer'
 import { NodeCard } from './components/NodeCard'
 import { NodeTable } from './components/NodeTable'
 import { NodeDetail } from './components/NodeDetail'
-import { WorldMap } from './components/WorldMap'
 import { TagFilter } from './components/TagFilter'
 import { RegionFilter } from './components/RegionFilter'
 import { useFleetTcpPing } from './hooks/useFleetTcpPing'
+
+const WorldMap = lazy(() =>
+  import('./components/WorldMap').then(m => ({ default: m.WorldMap })),
+)
 import { deriveUsage, displayName } from './utils/derive'
 import type { Sort, View } from './types'
 
@@ -234,7 +237,17 @@ export function App() {
           </div>
         )}
         {!empty && view === 'table' && <NodeTable nodes={list} onOpen={setSelected} />}
-        {!empty && view === 'map' && <WorldMap nodes={list} onOpen={setSelected} />}
+        {!empty && view === 'map' && (
+          <Suspense
+            fallback={
+              <div className="py-24 flex items-center justify-center text-sm text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" /> 加载地图中…
+              </div>
+            }
+          >
+            <WorldMap nodes={list} onOpen={setSelected} />
+          </Suspense>
+        )}
 
         {hasErrors && (
           <Alert variant="warning">
