@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { BackendPool } from '../api/pool'
 import { dynamicSummaryMulti, kvGetMulti, listAgentUuids, staticDataMulti } from '../api/methods'
 import { isOnline } from '../utils/status'
-import type { DynamicSummary, HistorySample, Node, NodeMeta, SiteConfig } from '../types'
+import type { DynamicSummary, HistorySample, Node, NodeMeta, SiteConfig, Site_Config } from '../types'
 
 type Agent = Pick<Node, 'id' | 'uuid' | 'source' | 'meta' | 'static'>
 
@@ -41,7 +41,7 @@ function sampleFrom(row: DynamicSummary): HistorySample {
   return { t: row.timestamp, cpu: row.cpu_usage ?? null, mem: memTotal && row.used_memory != null ? (row.used_memory / memTotal) * 100 : null, disk: diskTotal && row.available_space != null ? ((diskTotal - row.available_space) / diskTotal) * 100 : null, netIn: row.receive_speed ?? 0, netOut: row.transmit_speed ?? 0 }
 }
 
-export function useNodes(config: SiteConfig | null) {
+export function useNodes(config: SiteConfig | Site_Config | null) {
   const [agents, setAgents] = useState<Map<string, Agent>>(new Map())
   const [live, setLive] = useState<Map<string, DynamicSummary>>(new Map())
   const [history, setHistory] = useState<Map<string, HistorySample[]>>(new Map())

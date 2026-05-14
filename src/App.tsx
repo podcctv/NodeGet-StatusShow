@@ -160,6 +160,10 @@ export function App() {
   }, [nodes, query, activeTag, activeRegion, sort, regions])
 
   const selectedNode = selected ? nodes.get(selected) || [...nodes.values()].find(n => n.uuid === selected) || null : null
+  // Site_Config 兼容：user_preferences 优先，fallback 到旧式扁平字段
+  const siteName = (config as any).user_preferences?.site_name ?? (config as any).site_name ?? '你没设置'
+  const siteLogo = (config as any).user_preferences?.site_logo ?? (config as any).site_logo ?? DEFAULT_LOGO
+  const siteFooter = (config as any).user_preferences?.footer ?? (config as any).footer
   const fleetTcpPing = useFleetTcpPing(pool, list)
 
   if (configError) {
@@ -182,7 +186,7 @@ export function App() {
     )
   }
 
-  const logo = config.site_logo || DEFAULT_LOGO
+  const logo = siteLogo
   const empty = list.length === 0
   const hasErrors = errors.length > 0
 
@@ -190,7 +194,7 @@ export function App() {
     <div className="min-h-screen flex flex-col">
       <Background />
       <Navbar
-        siteName={config.site_name || '你没设置'}
+        siteName={siteName}
         logo={logo}
         query={query}
         onQuery={setQuery}
@@ -267,7 +271,11 @@ export function App() {
         )}
       </main>
 
-      <Footer text={config.footer} />
+      <Footer
+        text={siteFooter}
+        repo={(config as any).repository}
+        dist_page={(config as any).dist_page}
+      />
 
       <NodeDetail
         node={selectedNode}

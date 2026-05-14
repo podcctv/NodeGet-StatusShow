@@ -2,10 +2,10 @@ import type { Node, Usage } from '../types'
 
 export function deriveUsage(node: Node): Usage {
   const d = node.dynamic
+  const memUsed = d?.used_memory ?? 0
   const memTotal = d?.total_memory ?? 0
-  const memUsed = d?.used_memory ?? (memTotal && d?.available_memory != null ? memTotal - d.available_memory : 0)
   const diskTotal = d?.total_space ?? 0
-  const diskUsed = d?.used_space ?? (diskTotal && d?.available_space != null ? diskTotal - d.available_space : 0)
+  const diskUsed = diskTotal && d?.available_space != null ? diskTotal - d.available_space : 0
   return {
     cpu: d?.cpu_usage,
     mem: memTotal ? (memUsed / memTotal) * 100 : undefined,

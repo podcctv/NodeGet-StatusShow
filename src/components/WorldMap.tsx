@@ -31,7 +31,7 @@ interface CountryEntry {
 
 interface Props {
   nodes: Node[]
-  onOpen?: (id: string) => void
+  onOpen?: (uuid: string) => void
 }
 
 function ringBbox(ring: number[][]) {

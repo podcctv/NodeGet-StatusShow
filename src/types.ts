@@ -97,6 +97,38 @@ export interface SiteConfig {
   site_tokens: { name: string; backend_url: string; token: string }[]
 }
 
+// ── 上游 v1.4.x 新配置类型系统 ──
+
+export interface ThemeConfig {
+  name: string
+  description: string
+  author?: string
+  repository?: string
+  dist_page?: string
+  user_preferences_form?: {
+    site_name?: string
+    site_logo?: string
+    footer?: string
+  }
+  version?: string
+  license?: string
+}
+
+export interface UserConfig {
+  user_preferences: {
+    site_name?: string
+    site_logo?: string
+    footer?: string
+  }
+  site_tokens: {
+    name: string
+    backend_url: string
+    token: string
+  }[]
+}
+
+export type Site_Config = ThemeConfig & UserConfig
+
 export interface TaskQueryResult {
   task_id: number
   timestamp: number

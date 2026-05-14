@@ -11,7 +11,7 @@ import type { Node } from '../types'
 
 interface Props {
   nodes: Node[]
-  onOpen?: (id: string) => void
+  onOpen?: (uuid: string) => void
 }
 
 export function NodeTable({ nodes, onOpen }: Props) {
@@ -39,8 +39,8 @@ export function NodeTable({ nodes, onOpen }: Props) {
             const virt = virtLabel(n)
             return (
               <TableRow
-                key={n.id}
-                onClick={() => onOpen?.(n.id)}
+                key={n.uuid}
+                onClick={() => onOpen?.(n.uuid)}
                 className={cn('cursor-pointer', !n.online && 'opacity-60')}
               >
                 <TableCell>

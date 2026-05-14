@@ -21,80 +21,14 @@ function normalizeTs(ts: number) {
   return ts < 1_000_000_000_000 ? ts * 1000 : ts
 }
 
-export function latencySeriesName(row: TaskQueryResult) {
-  const source = typeof row.cron_source === 'string' ? row.cron_source.trim() : ''
-  if (source && source !== '未知') return source
-
-  const event = row.task_event_type
-  if (event && typeof event === 'object') {
-    const payload = event as Record<string, unknown>
-    const target = payload.tcp_ping ?? payload.ping
-    if (typeof target === 'string' && target.trim()) return target.trim()
-  }
-
-  return row.task_id ? `任务 #${row.task_id}` : '未知来源'
-}
-
-export function latencyTaskType(row: TaskQueryResult): LatencyType | null {
-  const event = row.task_event_type
-  if (event && typeof event === 'object') {
-    const payload = event as Record<string, unknown>
-    if ('tcp_ping' in payload || 'tcpPing' in payload) return 'tcp_ping'
-    if ('ping' in payload || 'icmp_ping' in payload || 'icmpPing' in payload) return 'ping'
-  }
-
-  const payload = row.task_event_result
-  if (payload && typeof payload === 'object') {
-    const result = payload as Record<string, unknown>
-    if ('tcp_ping' in result || 'tcpPing' in result) return 'tcp_ping'
-    if ('ping' in result || 'icmp_ping' in result || 'icmpPing' in result) return 'ping'
-  }
-
-  return null
-}
-
-export function latencyValue(row: TaskQueryResult, type: LatencyType): number | null {
-  if (!row.success) return null
-  const payload = row.task_event_result
-  if (!payload) return null
-
-  const keys =
-    type === 'tcp_ping'
-      ? ['tcp_ping', 'tcpPing', 'tcp', 'latency', 'value', 'delay', 'avg', 'min', 'time', 'duration']
-      : ['ping', 'icmp_ping', 'icmpPing', 'latency', 'value', 'delay', 'avg', 'min', 'time', 'duration']
-
-  const toNum = (v: unknown) => {
-    if (typeof v === 'number') return Number.isFinite(v) ? v : null
-    if (typeof v === 'string') {
-      const n = Number(v)
-      return Number.isFinite(n) ? n : null
-    }
-    return null
-  }
-
-  for (const key of keys) {
-    const v = toNum(payload[key])
-    if (v != null) return v
-  }
-
-  for (const v of Object.values(payload)) {
-    const top = toNum(v)
-    if (top != null) return top
-    if (v && typeof v === 'object') {
-      const nested = v as Record<string, unknown>
-      for (const key of keys) {
-        const nv = toNum(nested[key])
-        if (nv != null) return nv
-      }
-    }
-  }
-
-  return null
+function pickValue(row: TaskQueryResult, type: LatencyType): number | null {
+  const v = row.task_event_result?.[type]
+  return row.success && typeof v === 'number' ? v : null
 }
 
 function seriesNames(rows: TaskQueryResult[]) {
   const set = new Set<string>()
-  for (const r of rows) set.add(latencySeriesName(r))
+  for (const r of rows) set.add(r.cron_source || '未知')
   return [...set].sort((a, b) => a.localeCompare(b))
 }
 
@@ -133,7 +67,7 @@ export function buildLatencyChart(rows: TaskQueryResult[], type: LatencyType) {
       for (const n of names) pt[n] = null
       byTs.set(t, pt)
     }
-    pt[latencySeriesName(r)] = latencyValue(r, type)
+    pt[r.cron_source || '未知'] = pickValue(r, type)
   }
 
   const data = [...byTs.values()].sort((a, b) => a.t - b.t)
@@ -151,10 +85,10 @@ export interface LatencyStats {
 
 export function computeLatencyStats(rows: TaskQueryResult[], type: LatencyType): LatencyStats[] {
   const stats = seriesNames(rows).map<LatencyStats>(name => {
-    const list = rows.filter(r => latencySeriesName(r) === name)
+    const list = rows.filter(r => (r.cron_source || '未知') === name)
     const vals: number[] = []
     for (const r of list) {
-      const v = latencyValue(r, type)
+      const v = pickValue(r, type)
       if (v != null) vals.push(v)
     }
 
@@ -180,4 +114,26 @@ export function computeLatencyStats(rows: TaskQueryResult[], type: LatencyType):
     if (aj !== bj) return aj - bj
     return a.lossRate - b.lossRate
   })
+}
+
+// ── 兼容层：供 useFleetTcpPing 和 useNodeLatency 使用 ──
+
+export function latencySeriesName(row: TaskQueryResult): string {
+  return row.cron_source || '未知'
+}
+
+export function latencyTaskType(row: TaskQueryResult): LatencyType | null {
+  const t = row.task_event_type
+  if (!t) return null
+  const val = Object.values(t)[0] as string | undefined
+  if (val === 'ping' || val === 'tcp_ping') return val as LatencyType
+  const key = Object.keys(t)[0] as string | undefined
+  if (key === 'ping' || key === 'tcp_ping') return key as LatencyType
+  return null
+}
+
+export function latencyValue(row: TaskQueryResult, type: LatencyType): number | null {
+  if (!row.success) return null
+  const v = row.task_event_result?.[type]
+  return typeof v === 'number' ? v : null
 }
