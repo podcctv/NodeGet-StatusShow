@@ -160,10 +160,10 @@ export function App() {
   }, [nodes, query, activeTag, activeRegion, sort, regions])
 
   const selectedNode = selected ? nodes.get(selected) || [...nodes.values()].find(n => n.uuid === selected) || null : null
-  // Site_Config 兼容：user_preferences 优先，fallback 到旧式扁平字段
-  const siteName = (config as any).user_preferences?.site_name ?? (config as any).site_name ?? '你没设置'
-  const siteLogo = (config as any).user_preferences?.site_logo ?? (config as any).site_logo ?? DEFAULT_LOGO
-  const siteFooter = (config as any).user_preferences?.footer ?? (config as any).footer
+  // Site_Config 兼容：user_preferences 优先，fallback 到旧式扁平字段（config 可能为 null，需用 ?.）
+  const siteName = (config as any)?.user_preferences?.site_name ?? (config as any)?.site_name ?? '你没设置'
+  const siteLogo = (config as any)?.user_preferences?.site_logo ?? (config as any)?.site_logo ?? DEFAULT_LOGO
+  const siteFooter = (config as any)?.user_preferences?.footer ?? (config as any)?.footer
   const fleetTcpPing = useFleetTcpPing(pool, list)
 
   if (configError) {
