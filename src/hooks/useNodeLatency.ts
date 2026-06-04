@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { taskQuery } from '../api/methods'
 import { latencyTaskType, latencyValue } from '../utils/latency'
+import { createMockTaskRows } from '../mockData'
 import type { BackendPool } from '../api/pool'
 import type { LatencyType, TaskQueryResult } from '../types'
 
@@ -56,7 +57,21 @@ export function useNodeLatency(
     setTcpError(null)
     setTaskReadable(true)
 
-    if (!pool || !source || !uuid) return
+    if (!source || !uuid) return
+
+    if (!pool) {
+      const rows = createMockTaskRows({ uuid, source }, 24)
+      const now = Date.now()
+      const hourWindow: [number, number] = [now - HOUR_MS, now]
+      const pingRows = rows.filter(r => matchesLatencyType(r, 'ping'))
+      const tcpRows = rows.filter(r => matchesLatencyType(r, 'tcp_ping'))
+      setPingData(pingRows.filter(r => inWindow(r, hourWindow[0], hourWindow[1])))
+      setTcpData(tcpRows.filter(r => inWindow(r, hourWindow[0], hourWindow[1])))
+      setStatusData(rows)
+      setLoading(false)
+      return
+    }
+
     const entry = pool.entries.find(e => e.name === source)
     if (!entry) return
 

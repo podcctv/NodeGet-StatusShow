@@ -12,12 +12,12 @@ import { NodeDetail } from './components/NodeDetail'
 import { TagFilter } from './components/TagFilter'
 import { RegionFilter } from './components/RegionFilter'
 import { useFleetTcpPing } from './hooks/useFleetTcpPing'
+import { deriveUsage, displayName } from './utils/derive'
+import type { Sort, View } from './types'
 
 const WorldMap = lazy(() =>
   import('./components/WorldMap').then(m => ({ default: m.WorldMap })),
 )
-import { deriveUsage, displayName } from './utils/derive'
-import type { Sort, View } from './types'
 
 const DEFAULT_LOGO = `${import.meta.env.BASE_URL}logo.png`
 const VIEW_KEY = 'nodeget.view'
@@ -41,7 +41,7 @@ const num = (v?: number) => (Number.isFinite(v) ? (v as number) : -Infinity)
 
 export function App() {
   const { config, error: configError } = useConfig()
-  const { nodes, errors, pool } = useNodes(config)
+  const { nodes, errors, loading, pool } = useNodes(config)
 
   const [view, setView] = useState<View>(initialView)
   const [sort, setSort] = useState<Sort>(initialSort)
@@ -110,9 +110,7 @@ export function App() {
   const list = useMemo(() => {
     let arr = [...nodes.values()].filter(n => !n.meta?.hidden)
     if (activeTag) arr = arr.filter(n => n.meta?.tags?.includes(activeTag))
-    if (activeRegion) {
-      arr = arr.filter(n => n.meta?.region?.trim().toUpperCase() === activeRegion)
-    }
+    if (activeRegion) arr = arr.filter(n => n.meta?.region?.trim().toUpperCase() === activeRegion)
 
     const q = query.trim().toLowerCase()
     if (q) {
@@ -135,7 +133,6 @@ export function App() {
     }
 
     const rank = new Map(regions.list.map((r, i) => [r.code, i]))
-
     return arr.sort((a, b) => {
       if (a.online !== b.online) return a.online ? -1 : 1
 
@@ -152,16 +149,18 @@ export function App() {
         const ar = rank.get(a.meta?.region?.trim().toUpperCase() || '') ?? Infinity
         const br = rank.get(b.meta?.region?.trim().toUpperCase() || '') ?? Infinity
         cmp = ar - br
+      } else if (sort === 'default') {
+        cmp = (a.meta?.order ?? 0) - (b.meta?.order ?? 0)
       }
-      else if (sort === 'default') cmp = (a.meta?.order ?? 0) - (b.meta?.order ?? 0)
 
       return cmp || displayName(a).localeCompare(displayName(b))
     })
   }, [nodes, query, activeTag, activeRegion, sort, regions])
 
-  const selectedNode = selected ? nodes.get(selected) || [...nodes.values()].find(n => n.uuid === selected) || null : null
-  // Site_Config 兼容：user_preferences 优先，fallback 到旧式扁平字段（config 可能为 null，需用 ?.）
-  const siteName = (config as any)?.user_preferences?.site_name ?? (config as any)?.site_name ?? '你没设置'
+  const selectedNode = selected
+    ? nodes.get(selected) || [...nodes.values()].find(n => n.uuid === selected) || null
+    : null
+  const siteName = (config as any)?.user_preferences?.site_name ?? (config as any)?.site_name ?? '未设置站点'
   const siteLogo = (config as any)?.user_preferences?.site_logo ?? (config as any)?.site_logo ?? DEFAULT_LOGO
   const siteFooter = (config as any)?.user_preferences?.footer ?? (config as any)?.footer
   const fleetTcpPing = useFleetTcpPing(pool, list)
@@ -169,10 +168,16 @@ export function App() {
   if (configError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-8">
-        <Alert variant="destructive" className="max-w-lg">
+        <Alert variant="destructive" className="max-w-lg bg-card/80">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>加载 config.json 失败</AlertTitle>
-          <AlertDescription>{String(configError.message || configError)}</AlertDescription>
+          <AlertTitle>加载配置失败</AlertTitle>
+          <AlertDescription>
+            <p>{String(configError.message || configError)}</p>
+            <p className="mt-2">
+              本地调试可设置 <code>NODEGET_MOCK=true</code> 使用 Mock 数据，或复制
+              <code> .env.example </code>为 <code>.env.local</code> 后填入真实配置。
+            </p>
+          </AlertDescription>
         </Alert>
       </div>
     )
@@ -181,12 +186,11 @@ export function App() {
   if (!config) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-        加载中…
+        加载中...
       </div>
     )
   }
 
-  const logo = siteLogo
   const empty = list.length === 0
   const hasErrors = errors.length > 0
 
@@ -195,7 +199,7 @@ export function App() {
       <Background />
       <Navbar
         siteName={siteName}
-        logo={logo}
+        logo={siteLogo}
         query={query}
         onQuery={setQuery}
         view={view}
@@ -204,7 +208,7 @@ export function App() {
         onSort={setSort}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
         {!empty && (
           <RegionFilter
             regions={regions.list}
@@ -215,15 +219,17 @@ export function App() {
         )}
         {!empty && <TagFilter tags={allTags} active={activeTag} onChange={setActiveTag} />}
 
-        {empty && !hasErrors && (
+        {empty && !hasErrors && loading && (
           <div className="py-24 flex flex-col items-center gap-3 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="text-sm">连接后端中…</span>
+            <span className="text-sm">正在连接后端...</span>
           </div>
         )}
 
-        {empty && hasErrors && (
-          <div className="py-20 text-center text-muted-foreground">暂无节点</div>
+        {empty && (!loading || hasErrors) && (
+          <div className="rounded-lg border border-dashed border-border/70 bg-card/70 py-16 text-center text-sm text-muted-foreground">
+            暂无可展示节点
+          </div>
         )}
 
         {!empty && view === 'cards' && (
@@ -232,10 +238,10 @@ export function App() {
               <NodeCard
                 key={n.id}
                 node={n}
-                tcpPing={fleetTcpPing.byUuid.get(n.uuid)}
+                tcpPing={fleetTcpPing.byUuid.get(n.id)}
                 tcpPingLoading={fleetTcpPing.loading}
                 tcpPingReadable={fleetTcpPing.readable}
-                statusRows={fleetTcpPing.rawByUuid.get(n.uuid)}
+                statusRows={fleetTcpPing.rawByUuid.get(n.id)}
               />
             ))}
           </div>
@@ -245,7 +251,7 @@ export function App() {
           <Suspense
             fallback={
               <div className="py-24 flex items-center justify-center text-sm text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" /> 加载地图中…
+                <Loader2 className="h-5 w-5 animate-spin mr-2" /> 正在加载地图...
               </div>
             }
           >
@@ -254,7 +260,7 @@ export function App() {
         )}
 
         {hasErrors && (
-          <Alert variant="warning">
+          <Alert variant="warning" className="bg-card/80">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>{errors.length} 个后端错误</AlertTitle>
             <AlertDescription>

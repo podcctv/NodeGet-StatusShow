@@ -40,7 +40,7 @@ export function NodeTable({ nodes, onOpen }: Props) {
             return (
               <TableRow
                 key={n.uuid}
-                onClick={() => onOpen?.(n.uuid)}
+                onClick={() => onOpen?.(n.id)}
                 className={cn('cursor-pointer', !n.online && 'opacity-60')}
               >
                 <TableCell>

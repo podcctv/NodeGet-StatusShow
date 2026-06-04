@@ -176,7 +176,7 @@ export function WorldMap({ nodes, onOpen }: Props) {
         const cur = liveRef.current
         const e = cur.byCountry.get(p.name)
         if (!e) return
-        if (e.nodes.length === 1) cur.onOpen?.(e.nodes[0].uuid)
+        if (e.nodes.length === 1) cur.onOpen?.(e.nodes[0].id)
         else setPickedA2(p.name)
       })
     }
@@ -230,9 +230,9 @@ export function WorldMap({ nodes, onOpen }: Props) {
             a2={renderA2}
             entry={renderEntry}
             open={pickedA2 === renderA2}
-            onPick={uuid => {
+            onPick={id => {
               setPickedA2(null)
-              onOpen?.(uuid)
+              onOpen?.(id)
             }}
             onClose={() => setPickedA2(null)}
           />
@@ -351,7 +351,7 @@ function NodePopover({
   a2: string
   entry: CountryEntry
   open: boolean
-  onPick: (uuid: string) => void
+  onPick: (id: string) => void
   onClose: () => void
 }) {
   const cname = cnameMap.get(a2) || a2
@@ -386,7 +386,7 @@ function NodePopover({
             return (
               <button
                 key={n.uuid}
-                onClick={() => onPick(n.uuid)}
+                onClick={() => onPick(n.id)}
                 className="group w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent text-left transition-colors"
               >
                 <StatusDot online={n.online} className="w-1.5 h-1.5 ring-1" />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { taskQuery } from '../api/methods'
 import { computeLatencyStats, latencySeriesName, latencyTaskType, latencyValue } from '../utils/latency'
+import { createMockFleetRows } from '../mockData'
 import type { BackendPool } from '../api/pool'
 import type { Node, TaskQueryResult } from '../types'
 import type { HourlyBucket } from '../components/FleetTcpPingPanel'
@@ -8,14 +9,15 @@ import type { HourlyBucket } from '../components/FleetTcpPingPanel'
 const REFRESH_MS = 60_000
 const QUERY_TIMEOUT_MS = 20_000
 const MAX_NODES = 160
+const QUERY_CONCURRENCY = 6
 const DAY_MS = 24 * 60 * 60 * 1000
-const GLOBAL_LIMIT = 100_000
 const INITIAL_DELAY_MS = 3000
 
-/* ── IndexedDB Caching ── */
 const DB_NAME = 'NodeGetCache'
 const STORE_NAME = 'tcp_ping'
 const DB_VERSION = 1
+
+type CachedTaskRow = TaskQueryResult & { __nodeId?: string }
 
 function getDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -58,7 +60,6 @@ async function loadRowsFromCache(): Promise<TaskQueryResult[]> {
     return []
   }
 }
-/* ── End IndexedDB ── */
 
 function clean(rows: TaskQueryResult[] | undefined): TaskQueryResult[] {
   return (rows ?? [])
@@ -76,12 +77,18 @@ function carrierOf(name: string) {
 
 function mergeRows(groups: TaskQueryResult[][]) {
   const map = new Map<string, TaskQueryResult>()
-  for (const row of groups.flat()) map.set(`${row.task_id}:${row.timestamp}:${row.uuid}`, row)
+  for (const row of groups.flat()) {
+    map.set(`${nodeKey(row)}:${row.task_id}:${row.timestamp}`, row)
+  }
   return clean([...map.values()])
 }
 
 function normalizeTs(ts: number) {
   return ts < 1_000_000_000_000 ? ts * 1000 : ts
+}
+
+function nodeKey(row: TaskQueryResult) {
+  return String((row as CachedTaskRow).__nodeId ?? row.uuid)
 }
 
 function isTcpPingRow(row: TaskQueryResult): boolean {
@@ -109,6 +116,17 @@ function computeHourlyBuckets(rows: TaskQueryResult[], type: 'tcp_ping'): Hourly
   }))
 }
 
+async function runLimited(jobs: Array<() => Promise<void>>, limit: number) {
+  let index = 0
+  const workers = Array.from({ length: Math.min(limit, jobs.length) }, async () => {
+    while (index < jobs.length) {
+      const job = jobs[index++]
+      await job()
+    }
+  })
+  await Promise.allSettled(workers)
+}
+
 export interface CarrierRow {
   name: string
   avg: number | null
@@ -122,36 +140,43 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
   const [loading, setLoading] = useState(false)
   const [readable, setReadable] = useState(true)
 
-  const uuidSet = useMemo(
-    () => new Set(nodes.slice(0, MAX_NODES).map(n => n.uuid)),
+  const targets = useMemo(
+    () => nodes.slice(0, MAX_NODES).map(n => ({ id: n.id, uuid: n.uuid, source: n.source })),
     [nodes],
   )
-  const uuidKey = useMemo(() => [...uuidSet].sort().join('|'), [uuidSet])
+  const targetKey = useMemo(() => targets.map(t => t.id).sort().join('|'), [targets])
+  const targetIds = useMemo(() => new Set(targets.map(t => t.id)), [targets])
 
-  // Save to cache whenever rows change
   useEffect(() => {
-    if (rows.length > 0) {
-      saveRowsToCache(rows)
-    }
+    if (rows.length > 0) saveRowsToCache(rows)
   }, [rows])
 
   useEffect(() => {
     setReadable(true)
-    if (!pool || !uuidSet.size) return
+
+    if (!targets.length) {
+      setRows([])
+      setLoading(false)
+      return
+    }
+
+    if (!pool) {
+      setRows(createMockFleetRows(nodes.slice(0, MAX_NODES)))
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
 
-    // Instantly load from cache first
     loadRowsFromCache().then(cached => {
       if (cancelled) return
-      if (cached && cached.length > 0) {
-        const dayAgo = Date.now() - DAY_MS
-        const validCached = cached.filter(r => {
-          const ts = r.timestamp < 1_000_000_000_000 ? r.timestamp * 1000 : r.timestamp
-          return ts >= dayAgo && uuidSet.has(r.uuid)
-        })
-        if (validCached.length > 0) {
-          setRows(prev => prev.length === 0 ? validCached : mergeRows([validCached, prev]))
-        }
+      const dayAgo = Date.now() - DAY_MS
+      const validCached = cached.filter(r => {
+        const ts = normalizeTs(r.timestamp)
+        return ts >= dayAgo && targetIds.has(nodeKey(r))
+      })
+      if (validCached.length > 0) {
+        setRows(prev => (prev.length === 0 ? validCached : mergeRows([validCached, prev])))
       }
     })
 
@@ -159,63 +184,48 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       setLoading(true)
       const now = Date.now()
       const dayWindow: [number, number] = [now - DAY_MS, now]
+      const jobs = targets.flatMap(target => {
+        const entry = pool.entries.find(e => e.name === target.source)
+        if (!entry) return []
 
-      // Request each node sequentially and update state incrementally ("请求一个节点 显示一个节点")
-      const fetchAllSequentially = async () => {
-        for (const uuid of uuidSet) {
-          if (cancelled) break
-          for (const entry of pool.entries) {
-            if (cancelled) break
-            try {
-              // 20s interval = 3/min = 180/hr = 4320/day per network. 3 networks = 12960 rows. Limit 15000.
-              const res = await taskQuery(
-                entry.client,
-                [{ uuid }, { timestamp_from_to: dayWindow }, { type: 'tcp_ping' }, { limit: 15000 }],
-                QUERY_TIMEOUT_MS,
-              )
-              if (cancelled) return
+        return [async () => {
+          if (cancelled) return
+          try {
+            const res = await taskQuery(
+              entry.client,
+              [{ uuid: target.uuid }, { timestamp_from_to: dayWindow }, { type: 'tcp_ping' }, { limit: 15000 }],
+              QUERY_TIMEOUT_MS,
+            )
+            if (cancelled) return
 
-              const validRows = (res ?? []).filter(r => isTcpPingRow(r))
-              if (validRows.length > 0) {
-                setRows(prev => {
-                  const combined = mergeRows([prev, validRows])
-                  const dayAgo = Date.now() - DAY_MS
-                  return combined.filter(r => {
-                    const ts = r.timestamp < 1_000_000_000_000 ? r.timestamp * 1000 : r.timestamp
-                    return ts >= dayAgo
-                  })
-                })
-              }
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err)
-              if (/permission denied|missing task/i.test(msg)) {
-                setReadable(false)
-              }
+            const validRows = (res ?? [])
+              .filter(r => isTcpPingRow(r))
+              .map(r => ({ ...r, __nodeId: target.id } as TaskQueryResult))
+            if (validRows.length > 0) {
+              setRows(prev => {
+                const combined = mergeRows([prev, validRows])
+                const dayAgo = Date.now() - DAY_MS
+                return combined.filter(r => normalizeTs(r.timestamp) >= dayAgo && targetIds.has(nodeKey(r)))
+              })
             }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            if (/permission denied|missing task/i.test(msg)) setReadable(false)
           }
-        }
-      }
+        }]
+      })
 
-      await fetchAllSequentially()
+      await runLimited(jobs, QUERY_CONCURRENCY)
       if (!cancelled) setLoading(false)
     }
 
-    // ★ Delay initial fetch so main node data renders first
     const initialTimer = setTimeout(() => {
-      if (cancelled) return
-      fetchOnce()
+      if (!cancelled) fetchOnce()
     }, INITIAL_DELAY_MS)
-
-    // Then refresh periodically
     const refreshTimer = setTimeout(() => {
       if (cancelled) return
-      const interval = setInterval(() => {
-        if (!cancelled) fetchOnce()
-      }, REFRESH_MS)
-      // Store for cleanup
-      cleanupInterval = interval
+      cleanupInterval = setInterval(fetchOnce, REFRESH_MS)
     }, INITIAL_DELAY_MS + 1000)
-
     let cleanupInterval: ReturnType<typeof setInterval> | null = null
 
     return () => {
@@ -224,15 +234,15 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
       clearTimeout(refreshTimer)
       if (cleanupInterval) clearInterval(cleanupInterval)
     }
-  }, [pool, uuidKey])
+  }, [pool, targetKey, targetIds, targets, nodes])
 
-  // Raw rows per UUID — for online status strip (includes success AND failure rows)
   const rawByUuid = useMemo(() => {
     const map = new Map<string, TaskQueryResult[]>()
     for (const row of rows) {
-      const list = map.get(row.uuid) ?? []
+      const key = nodeKey(row)
+      const list = map.get(key) ?? []
       list.push(row)
-      map.set(row.uuid, list)
+      map.set(key, list)
     }
     return map
   }, [rows])
@@ -242,13 +252,14 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
     for (const row of rows) {
       const value = latencyValue(row, 'tcp_ping')
       if (value == null) continue
-      const list = nodeMap.get(row.uuid) ?? []
+      const key = nodeKey(row)
+      const list = nodeMap.get(key) ?? []
       list.push(row)
-      nodeMap.set(row.uuid, list)
+      nodeMap.set(key, list)
     }
 
     const out = new Map<string, CarrierRow[]>()
-    for (const [uuid, list] of nodeMap) {
+    for (const [key, list] of nodeMap) {
       const groups = new Map<string, TaskQueryResult[]>()
       for (const row of list) {
         const carrier = carrierOf(latencySeriesName(row))
@@ -256,10 +267,10 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
         group.push(row)
         groups.set(carrier, group)
       }
-      out.set(uuid, ['移动', '电信', '联通'].map(name => {
+      out.set(key, ['移动', '电信', '联通'].map(name => {
         const group = groups.get(name) ?? []
         const stats = computeLatencyStats(group, 'tcp_ping')
-        const vals = stats.flatMap(s => s.avg == null ? [] : [s.avg])
+        const vals = stats.flatMap(s => (s.avg == null ? [] : [s.avg]))
         const avg = vals.length ? vals.reduce((sum, v) => sum + v, 0) / vals.length : null
         const loss = stats.length ? stats.reduce((sum, s) => sum + s.lossRate, 0) / stats.length : null
         const hourly = computeHourlyBuckets(group, 'tcp_ping')
@@ -283,7 +294,7 @@ export function useFleetTcpPing(pool: BackendPool | null, nodes: Node[]) {
     return ['移动', '电信', '联通'].map(name => {
       const list = groups.get(name) ?? []
       const stats = computeLatencyStats(list, 'tcp_ping')
-      const vals = stats.flatMap(s => s.avg == null ? [] : [s.avg])
+      const vals = stats.flatMap(s => (s.avg == null ? [] : [s.avg]))
       const avg = vals.length ? vals.reduce((sum, v) => sum + v, 0) / vals.length : null
       const loss = stats.length ? stats.reduce((sum, s) => sum + s.lossRate, 0) / stats.length : null
       const hourly = computeHourlyBuckets(list, 'tcp_ping')

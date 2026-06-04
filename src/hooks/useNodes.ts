@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { BackendPool } from '../api/pool'
 import { dynamicSummaryMulti, kvGetMulti, listAgentUuids, staticDataMulti } from '../api/methods'
 import { isOnline } from '../utils/status'
+import { createMockNodes } from '../mockData'
 import type { DynamicSummary, HistorySample, Node, NodeMeta, SiteConfig, Site_Config } from '../types'
 
 type Agent = Pick<Node, 'id' | 'uuid' | 'source' | 'meta' | 'static'>
@@ -27,6 +28,8 @@ const DYN_INTERVAL_MS = 2000
 const HISTORY_LIMIT = 60
 
 const nodeId = (source: string, uuid: string) => `${source}::${uuid}`
+const isMockConfig = (config: SiteConfig | Site_Config | null) =>
+  Boolean(config?.site_tokens?.some(t => t.backend_url.startsWith('mock://')))
 
 function emptyMeta(): NodeMeta { return { name: '', region: '', tags: [], hidden: false, virtualization: '', lat: null, lng: null, order: 0, price: 0, priceUnit: '$', priceCycle: 30, expireTime: '' } }
 function blankAgent(uuid: string, source: string): Agent { return { id: nodeId(source, uuid), uuid, source, meta: emptyMeta(), static: {} } }
@@ -51,6 +54,17 @@ export function useNodes(config: SiteConfig | Site_Config | null) {
   const [pool, setPool] = useState<BackendPool | null>(null)
 
   useEffect(() => {
+    setErrors([])
+
+    if (isMockConfig(config)) {
+      setPool(null)
+      setAgents(new Map())
+      setLive(new Map())
+      setHistory(new Map())
+      setLoading(false)
+      return
+    }
+
     if (!config?.site_tokens?.length) { setLoading(false); return }
     const pool = new BackendPool(config.site_tokens)
     setPool(pool)
@@ -147,6 +161,8 @@ export function useNodes(config: SiteConfig | Site_Config | null) {
   }, [config])
 
   const nodes = useMemo(() => {
+    if (isMockConfig(config)) return createMockNodes()
+
     const now = Date.now()
     const out = new Map<string, Node>()
     for (const [id, a] of agents) {
@@ -154,7 +170,7 @@ export function useNodes(config: SiteConfig | Site_Config | null) {
       out.set(id, { ...a, dynamic: dyn, history: history.get(id) || [], online: isOnline(dyn?.timestamp, now) })
     }
     return out
-  }, [agents, live, history, tick])
+  }, [config, agents, live, history, tick])
 
   return { nodes, errors, loading, pool }
 }
