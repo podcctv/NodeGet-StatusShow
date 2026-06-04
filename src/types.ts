@@ -90,15 +90,6 @@ export interface Node {
   history: HistorySample[]
 }
 
-export interface SiteConfig {
-  site_name?: string
-  site_logo?: string
-  footer?: string
-  site_tokens: { name: string; backend_url: string; token: string }[]
-}
-
-// ── 上游 v1.4.x 新配置类型系统 ──
-
 export interface ThemeConfig {
   name: string
   description: string
@@ -106,9 +97,8 @@ export interface ThemeConfig {
   repository?: string
   dist_page?: string
   user_preferences_form?: {
-    site_name?: string
-    site_logo?: string
-    footer?: string
+    version?: string
+    items?: unknown[]
   }
   version?: string
   license?: string
@@ -127,7 +117,8 @@ export interface UserConfig {
   }[]
 }
 
-export type Site_Config = ThemeConfig & UserConfig
+export type SiteConfig = ThemeConfig & UserConfig
+export type Site_Config = SiteConfig
 
 export interface TaskQueryResult {
   task_id: number
